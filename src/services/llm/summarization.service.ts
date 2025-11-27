@@ -158,7 +158,7 @@ export class SummarizationService {
    */
   public async summarizeGraphMultiple(
     graph: Graph,
-    types: SummaryType[],
+    types: readonly SummaryType[],
     options: Omit<SummarizationOptions, 'type'> = {}
   ): Promise<Record<SummaryType, SummarizationResult>> {
     const results: Record<SummaryType, SummarizationResult> = {} as any;

@@ -127,6 +127,7 @@ describe('SummarizationService', () => {
     // Setup mocks
     (promptTemplateService.generatePrompt as jest.Mock).mockReturnValue(mockPromptTemplate);
     (promptTemplateService.estimateTokenCount as jest.Mock).mockReturnValue(100);
+    (promptTemplateService.getSupportedTypes as jest.Mock).mockReturnValue(['executive', 'detailed', 'chapter', 'bullet-points', 'narrative', 'technical']);
     (llmProviderManager.generateText as jest.Mock).mockResolvedValue(mockLLMResponse);
   });
 
@@ -220,7 +221,7 @@ describe('SummarizationService', () => {
 
       await expect(service.summarizeGraphMultiple(mockGraph, types))
         .rejects
-        .toThrow('Second call failed');
+        .toThrow('Summarization failed');
 
       // Should have called once before failing
       expect(llmProviderManager.generateText).toHaveBeenCalledTimes(2);

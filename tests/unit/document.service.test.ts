@@ -1,6 +1,11 @@
 import { DocumentService } from '../../src/services/document.service';
 import { Document, DocumentStatus } from '../../src/models';
 
+// Mock uuid to avoid ES module issues
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => 'mock-uuid-12345')
+}));
+
 // Mock the database client
 jest.mock('../../src/database/client', () => ({
   db: {

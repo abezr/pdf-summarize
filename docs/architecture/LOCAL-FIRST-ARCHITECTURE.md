@@ -26,15 +26,15 @@
 
 ```mermaid
 flowchart LR
-  user([User Browser\nlocalhost]) --> api[Express API\nlocalhost:3000]
-  api --> pipeline[Processing Pipeline\npdf-parse | Tesseract | graph | embeddings]
-  api --> cache[(Cache\nnode-cache)]
-  api --> db[(SQLite\n./data/database.sqlite)]
-  api --> fs[(Local FS\n./data/uploads\n./data/graphs\n./data/embeddings\n./data/cache)]
+  user([User Browser<br/>localhost]) --> api[Express API<br/>localhost:3000]
+  api --> pipeline[Processing Pipeline<br/>pdf-parse · Tesseract · graph · embeddings]
+  api --> cache[(Cache<br/>node-cache)]
+  api --> db[(SQLite<br/>./data/database.sqlite)]
+  api --> fs[(Local FS<br/>./data/uploads<br/>./data/graphs<br/>./data/embeddings<br/>./data/cache)]
   pipeline --> fs
   pipeline --> db
   pipeline --> cache
-  pipeline -->|LLM calls| llm[(LLM APIs\nOpenAI / Gemini)]
+  pipeline -->|LLM calls| llm[(LLM APIs<br/>OpenAI / Gemini)]
   fs -. cached inputs/outputs .-> pipeline
   db -. metadata/summaries .-> api
 ```

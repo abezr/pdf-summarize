@@ -166,6 +166,7 @@ export class PromptTemplateService {
     for (const [sectionId, sectionNodes] of sections) {
       const sectionNode = sectionNodes[0];
       contextParts.push(`## ${sectionNode.label}\n`);
+      contextParts.push(`${sectionNode.content}\n`);
 
       for (let i = 1; i < sectionNodes.length; i++) {
         const paragraphNode = sectionNodes[i];

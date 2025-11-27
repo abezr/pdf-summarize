@@ -1,6 +1,8 @@
 import { Graph } from './graph';
 import { GraphFactory } from './graph-factory';
 import { PDFParseResult, PDFParagraph } from '../pdf-parser.service';
+import { ExtractedTable } from '../table-detection.service';
+import { ExtractedImage } from '../image-extraction.service';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 
@@ -12,7 +14,7 @@ export class GraphBuilder {
   /**
    * Build a complete graph from PDF parsing results
    */
-  static async buildGraph(documentId: string, pdfResult: PDFParseResult): Promise<Graph> {
+  static async buildGraph(documentId: string, pdfResult: PDFParseResult, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<Graph> {
     const startTime = Date.now();
 
     try {
@@ -26,7 +28,7 @@ export class GraphBuilder {
       const graph = new Graph(documentId);
 
       // Build the graph structure
-      await this.buildGraphStructure(graph, pdfResult);
+      await this.buildGraphStructure(graph, pdfResult, tables, images);
 
       // Mark as complete and calculate processing time
       const processingTime = Date.now() - startTime;
@@ -59,7 +61,7 @@ export class GraphBuilder {
   /**
    * Build the complete graph structure from PDF results
    */
-  private static async buildGraphStructure(graph: Graph, pdfResult: PDFParseResult): Promise<void> {
+  private static async buildGraphStructure(graph: Graph, pdfResult: PDFParseResult, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<void> {
     // 1. Create document root node
     const documentNode = GraphFactory.createDocumentNode(
       pdfResult.metadata.title || 'Untitled Document',
@@ -87,7 +89,7 @@ export class GraphBuilder {
 
     // 3. Process each page
     for (const page of pdfResult.pages) {
-      await this.processPage(graph, page, documentNode.id);
+      await this.processPage(graph, page, documentNode.id, tables, images);
     }
 
     // 4. Create sequential edges between all paragraphs
@@ -133,7 +135,7 @@ export class GraphBuilder {
   /**
    * Process a single page and create nodes for its content
    */
-  private static async processPage(graph: Graph, page: PDFParseResult['pages'][0], documentNodeId: string): Promise<void> {
+  private static async processPage(graph: Graph, page: PDFParseResult['pages'][0], documentNodeId: string, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<void> {
     // Create hierarchical containment: document → page content
     const pageContainerNode = GraphFactory.createNode({
       type: 'metadata',
@@ -179,6 +181,16 @@ export class GraphBuilder {
         const pageToParaEdge = GraphFactory.createContainsEdge(pageContainerNode.id, fallbackParagraph.id);
         graph.addEdge(pageToParaEdge);
       }
+    }
+
+    // Process tables on this page
+    if (tables && tables.length > 0) {
+      this.processTablesOnPage(graph, tables, page.pageNumber, pageContainerNode.id);
+    }
+
+    // Process images on this page
+    if (images && images.length > 0) {
+      this.processImagesOnPage(graph, images, page.pageNumber, pageContainerNode.id);
     }
 
     // Process text elements (simplified - could be enhanced for better structure detection)
@@ -359,6 +371,159 @@ export class GraphBuilder {
         graph.addEdge(hierarchicalEdge);
       }
     }
+  }
+
+  /**
+   * Process tables found on a specific page
+   */
+  private static processTablesOnPage(
+    graph: Graph,
+    tables: ExtractedTable[],
+    pageNumber: number,
+    pageContainerNodeId: string
+  ): void {
+    // Filter tables for this page
+    const pageTables = tables.filter(table => table.pageNumber === pageNumber);
+
+    if (pageTables.length === 0) {
+      return;
+    }
+
+    logger.debug(`Processing ${pageTables.length} tables on page ${pageNumber}`);
+
+    for (const table of pageTables) {
+      try {
+        // Create table node
+        const tableNode = this.createTableNode(table);
+        graph.addNode(tableNode);
+
+        // Connect page to table
+        const pageToTableEdge = GraphFactory.createContainsEdge(pageContainerNodeId, tableNode.id);
+        graph.addEdge(pageToTableEdge);
+
+        logger.debug(`Created table node: ${tableNode.id} (${table.data.rows.length}x${table.data.rows[0]?.length || 0})`);
+
+      } catch (error) {
+        logger.warn(`Failed to create table node for table ${table.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Process images found on a specific page
+   */
+  private static processImagesOnPage(
+    graph: Graph,
+    images: ExtractedImage[],
+    pageNumber: number,
+    pageContainerNodeId: string
+  ): void {
+    // Filter images for this page
+    const pageImages = images.filter(image => image.pageNumber === pageNumber);
+
+    if (pageImages.length === 0) {
+      return;
+    }
+
+    logger.debug(`Processing ${pageImages.length} images on page ${pageNumber}`);
+
+    for (const image of pageImages) {
+      try {
+        // Create image node
+        const imageNode = this.createImageNode(image);
+        graph.addNode(imageNode);
+
+        // Connect page to image
+        const pageToImageEdge = GraphFactory.createContainsEdge(pageContainerNodeId, imageNode.id);
+        graph.addEdge(pageToImageEdge);
+
+        logger.debug(`Created image node: ${imageNode.id} (${image.width}x${image.height}, ${image.format})`);
+
+      } catch (error) {
+        logger.warn(`Failed to create image node for image ${image.id}:`, error);
+      }
+    }
+  }
+
+  /**
+   * Create a table node from extracted table data
+   */
+  private static createTableNode(table: ExtractedTable): ReturnType<typeof GraphFactory.createTableNode> {
+    const rowCount = table.data.rows.length;
+    const colCount = table.data.rows[0]?.length || 0;
+
+    // Create position info (use table bbox if available, otherwise estimate)
+    const position = {
+      page: table.pageNumber,
+      start: 0, // Would need better positioning logic
+      end: table.data.rawText.length
+    };
+
+    // Create metadata with table-specific properties
+    const metadata = {
+      confidence: table.confidence,
+      properties: {
+        tableNumber: table.tableNumber,
+        extractionMethod: table.method,
+        headers: table.data.headers,
+        bbox: table.bbox,
+        rawText: table.data.rawText
+      }
+    };
+
+    return GraphFactory.createTableNode(
+      table.data.rawText, // Use raw text as content
+      position,
+      rowCount,
+      colCount,
+      table.confidence,
+      metadata
+    );
+  }
+
+  /**
+   * Create an image node from extracted image data
+   */
+  private static createImageNode(image: ExtractedImage): ReturnType<typeof GraphFactory.createImageNode> {
+    // Create position info for the image
+    const position = {
+      page: image.pageNumber,
+      start: image.imageNumber * 1000, // Estimate position based on image order
+      end: (image.imageNumber + 1) * 1000
+    };
+
+    // Create alt text from filename or generate generic one
+    const altText = image.fileName || `Image ${image.imageNumber + 1} on page ${image.pageNumber}`;
+
+    // Create metadata with image-specific properties
+    const metadata = {
+      confidence: 0.8, // Default confidence for extracted images
+      properties: {
+        imageId: image.id,
+        filePath: image.filePath,
+        fileName: image.fileName,
+        format: image.format,
+        width: image.width,
+        height: image.height,
+        size: image.size,
+        dpi: image.dpi,
+        extractionMethod: image.method,
+        storageId: image.metadata?.storageId,
+        mimeType: image.metadata?.mimeType,
+        colorSpace: image.metadata?.colorSpace,
+        hasAlpha: image.metadata?.hasAlpha,
+        compression: image.metadata?.compression
+      },
+      ...image.metadata
+    };
+
+    return GraphFactory.createImageNode(
+      altText,
+      position,
+      { width: image.width, height: image.height },
+      0.8, // Default confidence
+      metadata
+    );
   }
 
   /**

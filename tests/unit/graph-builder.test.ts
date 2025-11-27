@@ -1,5 +1,7 @@
 import { GraphBuilder } from '../../src/services/graph';
 import { PDFParseResult, PDFPage, PDFParagraph, PDFMetadata } from '../../src/services/pdf-parser.service';
+import { ExtractedTable } from '../../src/services/table-detection.service';
+import { ExtractedImage } from '../../src/services/image-extraction.service';
 
 // Mock uuid to avoid ES module issues
 let uuidCounter = 0;
@@ -324,6 +326,304 @@ describe('GraphBuilder', () => {
       expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
       expect(graph.metadata.processingTime).toBeGreaterThan(0);
       expect(graph.metadata.processingTime).toBeLessThan(5000);
+    });
+  });
+
+  describe('table integration', () => {
+    test('should create table nodes when tables are provided', async () => {
+      const mockTables: ExtractedTable[] = [
+        {
+          id: 'table_1_0',
+          pageNumber: 1,
+          tableNumber: 0,
+          data: {
+            headers: ['Name', 'Age', 'City'],
+            rows: [
+              ['John', '25', 'NYC'],
+              ['Jane', '30', 'LA']
+            ],
+            rawText: 'Name | Age | City\nJohn | 25 | NYC\nJane | 30 | LA'
+          },
+          confidence: 0.85,
+          method: 'tabula'
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('table-doc', mockPdfResult, mockTables);
+
+      // Should have document node + page nodes + paragraph nodes + table node
+      expect(graph.statistics.nodeCount).toBeGreaterThan(9); // Original count was 9
+
+      // Check that table node was created
+      const tableNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'table');
+      expect(tableNodes).toHaveLength(1);
+
+      const tableNode = tableNodes[0];
+      expect(tableNode.label).toContain('Table: 2x3');
+      expect(tableNode.content).toContain('Name | Age | City');
+      expect(tableNode.metadata?.properties?.tableNumber).toBe(0);
+      expect(tableNode.metadata?.properties?.extractionMethod).toBe('tabula');
+    });
+
+    test('should handle empty table array', async () => {
+      const graph = await GraphBuilder.buildGraph('no-tables-doc', mockPdfResult, []);
+
+      // Should work normally without tables
+      expect(graph.statistics.nodeCount).toBe(9);
+    });
+
+    test('should filter tables by page number', async () => {
+      const mockTables: ExtractedTable[] = [
+        {
+          id: 'table_1_0',
+          pageNumber: 1,
+          tableNumber: 0,
+          data: {
+            headers: ['Col1', 'Col2'],
+            rows: [['A', 'B']],
+            rawText: 'Col1 | Col2\nA | B'
+          },
+          confidence: 0.8,
+          method: 'tabula'
+        },
+        {
+          id: 'table_2_0',
+          pageNumber: 2, // Different page
+          tableNumber: 0,
+          data: {
+            headers: ['Col1', 'Col2'],
+            rows: [['X', 'Y']],
+            rawText: 'Col1 | Col2\nX | Y'
+          },
+          confidence: 0.8,
+          method: 'tabula'
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('multi-page-tables-doc', mockPdfResult, mockTables);
+
+      // Should have 2 table nodes (one per page)
+      const tableNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'table');
+      expect(tableNodes).toHaveLength(2);
+    });
+  });
+
+  describe('image integration', () => {
+    test('should create image nodes when images are provided', async () => {
+      const mockImages: ExtractedImage[] = [
+        {
+          id: 'image_1_0_123456789',
+          pageNumber: 1,
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_1_image_0_123456789.png',
+          fileName: 'page_1_image_0_123456789.png',
+          format: 'png',
+          width: 800,
+          height: 600,
+          size: 245760,
+          dpi: 150,
+          method: 'pdf2pic',
+          metadata: {
+            storageId: 'storage-123',
+            mimeType: 'image/png',
+            colorSpace: 'RGB',
+            hasAlpha: false,
+            compression: 'deflate'
+          }
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('image-doc', mockPdfResult, undefined, mockImages);
+
+      // Should have document node + page nodes + paragraph nodes + image node
+      expect(graph.statistics.nodeCount).toBeGreaterThan(9); // Original count was 9
+
+      // Check that image node was created
+      const imageNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'image');
+      expect(imageNodes).toHaveLength(1);
+
+      const imageNode = imageNodes[0];
+      expect(imageNode.label).toContain('Image: page_1_image_0');
+      expect(imageNode.content).toBe('page_1_image_0_123456789.png');
+      expect(imageNode.metadata?.properties?.imageId).toBe('image_1_0_123456789');
+      expect(imageNode.metadata?.properties?.width).toBe(800);
+      expect(imageNode.metadata?.properties?.height).toBe(600);
+      expect(imageNode.metadata?.properties?.format).toBe('png');
+      expect(imageNode.metadata?.properties?.extractionMethod).toBe('pdf2pic');
+      expect(imageNode.metadata?.properties?.storageId).toBe('storage-123');
+    });
+
+    test('should handle empty image array', async () => {
+      const graph = await GraphBuilder.buildGraph('no-images-doc', mockPdfResult, undefined, []);
+
+      // Should work normally without images
+      expect(graph.statistics.nodeCount).toBe(9);
+    });
+
+    test('should filter images by page number', async () => {
+      const mockImages: ExtractedImage[] = [
+        {
+          id: 'image_1_0_123456789',
+          pageNumber: 1,
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_1_image_0_123456789.png',
+          fileName: 'page_1_image_0_123456789.png',
+          format: 'png',
+          width: 400,
+          height: 300,
+          size: 122880,
+          dpi: 150,
+          method: 'pdf2pic'
+        },
+        {
+          id: 'image_2_0_987654321',
+          pageNumber: 2, // Different page
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_2_image_0_987654321.png',
+          fileName: 'page_2_image_0_987654321.png',
+          format: 'png',
+          width: 600,
+          height: 400,
+          size: 184320,
+          dpi: 150,
+          method: 'pdf2pic'
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('multi-page-images-doc', mockPdfResult, undefined, mockImages);
+
+      // Should have 2 image nodes (one per page)
+      const imageNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'image');
+      expect(imageNodes).toHaveLength(2);
+
+      // Check that images are on correct pages
+      const page1Images = imageNodes.filter(node => node.position.page === 1);
+      const page2Images = imageNodes.filter(node => node.position.page === 2);
+      expect(page1Images).toHaveLength(1);
+      expect(page2Images).toHaveLength(1);
+
+      expect(page1Images[0].metadata?.properties?.imageId).toBe('image_1_0_123456789');
+      expect(page2Images[0].metadata?.properties?.imageId).toBe('image_2_0_987654321');
+    });
+
+    test('should handle multiple images on same page', async () => {
+      const mockImages: ExtractedImage[] = [
+        {
+          id: 'image_1_0_111111111',
+          pageNumber: 1,
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_1_image_0_111111111.png',
+          fileName: 'page_1_image_0_111111111.png',
+          format: 'png',
+          width: 200,
+          height: 150,
+          size: 61440,
+          dpi: 150,
+          method: 'pdf2pic'
+        },
+        {
+          id: 'image_1_1_222222222',
+          pageNumber: 1, // Same page
+          imageNumber: 1,
+          filePath: '/data/images/test-doc/page_1_image_1_222222222.png',
+          fileName: 'page_1_image_1_222222222.png',
+          format: 'png',
+          width: 300,
+          height: 200,
+          size: 92160,
+          dpi: 150,
+          method: 'pdf2pic'
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('multi-images-page-doc', mockPdfResult, undefined, mockImages);
+
+      // Should have 2 image nodes
+      const imageNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'image');
+      expect(imageNodes).toHaveLength(2);
+
+      // Both should be on page 1
+      const page1Images = imageNodes.filter(node => node.position.page === 1);
+      expect(page1Images).toHaveLength(2);
+
+      // Check image numbers
+      const image0 = imageNodes.find(node => node.metadata?.properties?.imageId === 'image_1_0_111111111');
+      const image1 = imageNodes.find(node => node.metadata?.properties?.imageId === 'image_1_1_222222222');
+      expect(image0).toBeDefined();
+      expect(image1).toBeDefined();
+    });
+
+    test('should create proper edges between pages and images', async () => {
+      const mockImages: ExtractedImage[] = [
+        {
+          id: 'image_1_0_123456789',
+          pageNumber: 1,
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_1_image_0_123456789.png',
+          fileName: 'page_1_image_0_123456789.png',
+          format: 'png',
+          width: 400,
+          height: 300,
+          size: 122880,
+          dpi: 150,
+          method: 'pdf2pic'
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('edges-doc', mockPdfResult, undefined, mockImages);
+
+      // Find page container node for page 1
+      const pageNodes = Array.from(graph.nodes.values()).filter(node =>
+        node.type === 'metadata' && node.label === 'Page 1'
+      );
+      expect(pageNodes).toHaveLength(1);
+      const pageNode = pageNodes[0];
+
+      // Find image node
+      const imageNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'image');
+      expect(imageNodes).toHaveLength(1);
+      const imageNode = imageNodes[0];
+
+      // Check that there's a "contains" edge from page to image
+      const containsEdges = Array.from(graph.edges.values()).filter(edge =>
+        edge.type === 'contains' &&
+        edge.source === pageNode.id &&
+        edge.target === imageNode.id
+      );
+      expect(containsEdges).toHaveLength(1);
+
+      const edge = containsEdges[0];
+      expect(edge.weight).toBe(1.0); // Default weight for contains edges
+    });
+
+    test('should handle images with missing metadata gracefully', async () => {
+      const mockImages: ExtractedImage[] = [
+        {
+          id: 'image_1_0_minimal',
+          pageNumber: 1,
+          imageNumber: 0,
+          filePath: '/data/images/test-doc/page_1_image_0_minimal.png',
+          fileName: 'page_1_image_0_minimal.png',
+          format: 'png',
+          width: 100,
+          height: 100,
+          size: 10240,
+          dpi: 72,
+          method: 'pdf2pic'
+          // No metadata object
+        }
+      ];
+
+      const graph = await GraphBuilder.buildGraph('minimal-image-doc', mockPdfResult, undefined, mockImages);
+
+      // Should still create the image node
+      const imageNodes = Array.from(graph.nodes.values()).filter(node => node.type === 'image');
+      expect(imageNodes).toHaveLength(1);
+
+      const imageNode = imageNodes[0];
+      expect(imageNode.metadata?.properties?.width).toBe(100);
+      expect(imageNode.metadata?.properties?.height).toBe(100);
+      expect(imageNode.metadata?.properties?.storageId).toBeUndefined();
     });
   });
 });

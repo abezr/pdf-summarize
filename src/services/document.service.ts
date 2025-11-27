@@ -314,7 +314,7 @@ export class DocumentService {
 
       const result = await db.query(query, values);
 
-      const deleted = result.rowCount > 0;
+      const deleted = (result.rowCount ?? 0) > 0;
 
       if (deleted) {
         logger.info('Document deleted', { id });

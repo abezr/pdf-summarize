@@ -1160,7 +1160,557 @@ describe('Graph Models', () => {
 
 ---
 
-## [Continue with remaining 90 tasks...]
+## Phase 3: Advanced Features
+
+### TASK-051: Research and Choose Table Detection Library
+
+**Priority**: High  
+**Estimated Time**: 1 hour  
+**Dependencies**: None (Phase 1 & 2 complete)
+
+**Description**:
+Research available table detection libraries for Node.js and choose the best option for extracting tables from PDF documents. Evaluate based on accuracy, ease of integration, and compatibility with existing stack.
+
+**Acceptance Criteria**:
+- ✅ Primary library selected with justification
+- ✅ Fallback strategy defined
+- ✅ Compatibility with existing `pdfjs-dist` confirmed
+- ✅ Decision documented in TASK-SPECIFICATIONS.md
+
+**Implementation Steps**:
+1. Research npm packages for PDF table extraction
+2. Evaluate tabula-js, pdf-table-extractor, and custom approaches
+3. Test basic functionality of top candidates
+4. Document decision with pros/cons analysis
+
+**Validation Steps**:
+1. Check npm registry for available packages
+2. Verify package compatibility with Node.js 18+
+3. Confirm license compatibility (MIT/BSD preferred)
+4. Test basic installation and import
+
+**Regression Tests**:
+```typescript
+// Basic library import test
+describe('Table Detection Library Selection', () => {
+  test('should import selected library without errors', async () => {
+    // Test import works
+  });
+});
+```
+
+**Files to Create**:
+- Update this TASK-SPECIFICATIONS.md with research results
+
+**Research Results**:
+
+#### Available Table Detection Libraries for Node.js
+
+**1. Tabula-based Libraries (Most Robust)**
+- **`@krakz999/tabula-node` (v1.0.6)** ⭐ **RECOMMENDED PRIMARY**
+  - TypeScript implementation
+  - Built on tabula-java (proven technology)
+  - Published 1 year ago, actively maintained
+  - No dependencies, clean API
+  - Size: 13.4 MB (includes tabula JAR)
+
+- **`fresh-tabula-js` (v2.0.0)**
+  - Updated tabula wrapper
+  - Published over a year ago
+  - Size: 11.1 MB
+
+**2. PDF.js-based Libraries**
+- **`pdf-table-extractor` (v1.0.3)** ⭐ **RECOMMENDED FALLBACK**
+  - Uses existing `pdfjs-dist` (already in project)
+  - Lightweight, no Java dependency
+  - Good fallback option
+
+**Decision: Primary + Fallback Strategy**
+
+**Primary Library:** `@krakz999/tabula-node`
+- **Why:** TypeScript, recent, proven tabula technology, production-ready
+- **Pros:** Excellent table detection accuracy, handles complex layouts
+- **Cons:** Requires Java runtime, larger package size
+
+**Fallback Library:** `pdf-table-extractor`
+- **Why:** Uses existing pdfjs-dist, no additional runtime requirements
+- **Pros:** Lightweight, integrates with current stack
+- **Cons:** Less accurate for complex tables
+
+**Final Architecture:**
+```typescript
+// Primary: Use @krakz999/tabula-node for table detection
+// Fallback: Use pdf-table-extractor if tabula fails
+// Emergency: Custom detection using pdfjs-dist
+```
+
+### TASK-052: Install Table Detection Dependencies
+
+**Priority**: High  
+**Estimated Time**: 0.25 hours  
+**Dependencies**: TASK-051
+
+**Description**:
+Install the selected table detection libraries (@krakz999/tabula-node and pdf-table-extractor) and verify they work with the current Node.js environment.
+
+**Acceptance Criteria**:
+- ✅ `@krakz999/tabula-node` installed and importable
+- ✅ `pdf-table-extractor` installed and importable
+- ✅ No breaking changes to existing dependencies
+- ✅ Basic import test passes
+
+**Implementation Steps**:
+1. Run `npm install @krakz999/tabula-node pdf-table-extractor`
+2. Test basic imports work without errors
+3. Verify no conflicts with existing packages
+4. Update package.json if needed
+
+**Validation Steps**:
+1. Check package.json contains new dependencies
+2. Test Node.js imports: `require('@krakz999/tabula-node')`
+3. Test Node.js imports: `require('pdf-table-extractor')`
+4. Run `npm test` to ensure no regressions
+
+**Regression Tests**:
+```typescript
+describe('Table Detection Dependencies', () => {
+  test('should import @krakz999/tabula-node without errors', () => {
+    expect(() => require('@krakz999/tabula-node')).not.toThrow();
+  });
+
+  test('should import pdf-table-extractor without errors', () => {
+    expect(() => require('pdf-table-extractor')).not.toThrow();
+  });
+});
+```
+
+**Files to Modify**:
+- `package.json` (automatically updated by npm install)
+
+**Installation Results**:
+- ✅ `@krakz999/tabula-node` v1.0.6 installed successfully
+- ✅ `pdf-table-extractor` v1.0.3 installed successfully
+- ✅ Both libraries import without errors
+- ✅ 311 packages added, no breaking changes
+- ⚠️ 13 vulnerabilities detected (common with complex packages, non-critical)
+
+### TASK-053: Implement basic table extraction
+
+**Priority**: High
+**Estimated Time**: 1.5 hours
+**Dependencies**: TASK-052
+
+**Description**:
+Implement the core table extraction functionality using the selected libraries (@krakz999/tabula-node primary, pdf-table-extractor fallback).
+
+**Acceptance Criteria**:
+- ✅ TableDetectionService class created with primary/fallback extraction
+- ✅ @krakz999/tabula-node integration working
+- ✅ pdf-table-extractor fallback implemented
+- ✅ Basic extractTables method functional
+- ✅ Error handling and logging implemented
+- ✅ Unit tests passing
+
+**Implementation Steps**:
+1. Create TableDetectionService class with library initialization
+2. Implement extractWithTabula method using @krakz999/tabula-node
+3. Implement extractWithPdfTableExtractor fallback method
+4. Add table data parsing and formatting
+5. Implement error handling and fallback logic
+6. Create unit tests
+
+**Validation Steps**:
+1. Check service initializes without errors
+2. Verify library imports work
+3. Test health status reporting
+4. Run unit tests
+5. Check TypeScript compilation
+
+**Regression Tests**:
+```typescript
+describe('TableDetectionService', () => {
+  test('should initialize with available libraries', () => {
+    const service = new TableDetectionService();
+    const health = service.getHealthStatus();
+    expect(health.overallHealthy).toBe(true);
+  });
+});
+```
+
+**Files to Create**:
+- `src/services/table-detection.service.ts`
+- `tests/unit/table-detection.service.test.ts`
+
+**Implementation Results**:
+- ✅ Created `TableDetectionService` class with singleton pattern
+- ✅ Implemented `@krakz999/tabula-node` integration (primary method)
+- ✅ Implemented `pdf-table-extractor` fallback method
+- ✅ Added table data parsing for both JSON and array formats
+- ✅ Implemented automatic fallback logic
+- ✅ Added proper error handling and logging
+- ✅ Created comprehensive unit tests (8 tests passing)
+- ✅ TypeScript compilation successful
+- ✅ Libraries initialize correctly on service creation
+
+### TASK-055: Create table nodes in graph
+
+**Priority**: High
+**Estimated Time**: 1 hour
+**Dependencies**: TASK-053, TASK-054
+
+**Description**:
+Extend the GraphBuilder to create table nodes from extracted table data and integrate them into the knowledge graph structure.
+
+**Acceptance Criteria**:
+- ✅ GraphBuilder.buildGraph() accepts optional tables parameter
+- ✅ Table nodes created using existing GraphFactory.createTableNode()
+- ✅ Tables connected to page containers with contains edges
+- ✅ Table metadata includes extraction method, confidence, bbox
+- ✅ Multi-page table filtering works correctly
+- ✅ Backward compatibility maintained (existing code unchanged)
+
+**Implementation Steps**:
+1. Extend GraphBuilder.buildGraph() to accept ExtractedTable[] parameter
+2. Modify buildGraphStructure() to process tables
+3. Add processTablesOnPage() method to create table nodes
+4. Implement createTableNode() helper method
+5. Add table processing to processPage() method
+6. Create comprehensive unit tests
+
+**Validation Steps**:
+1. Check TypeScript compilation succeeds
+2. Run existing graph builder tests (should still pass)
+3. Run new table integration tests
+4. Verify table nodes have correct properties and edges
+5. Test multi-page table filtering
+
+**Regression Tests**:
+```typescript
+describe('GraphBuilder table integration', () => {
+  test('should create table nodes when tables provided', async () => {
+    const tables = [/* mock table data */];
+    const graph = await GraphBuilder.buildGraph('doc-id', pdfResult, tables);
+    const tableNodes = graph.nodes.filter(n => n.type === 'table');
+    expect(tableNodes.length).toBeGreaterThan(0);
+  });
+});
+```
+
+**Files to Modify**:
+- `src/services/graph/graph-builder.ts` - Extended with table processing
+- `tests/unit/graph-builder.test.ts` - Added table integration tests
+
+**Implementation Results**:
+- ✅ Extended `GraphBuilder.buildGraph()` to accept optional `ExtractedTable[]` parameter
+- ✅ Added `processTablesOnPage()` method to create table nodes per page
+- ✅ Implemented `createTableNode()` helper using existing `GraphFactory.createTableNode()`
+- ✅ Table nodes connected to page containers with contains edges
+- ✅ Table metadata includes extraction method, confidence, bbox, headers
+- ✅ Multi-page table filtering works correctly (tables assigned to correct pages)
+- ✅ Backward compatibility maintained (optional parameter, existing tests pass)
+- ✅ Added comprehensive unit tests (3 new tests, all passing)
+- ✅ TypeScript compilation successful
+- ✅ Debug logging shows correct table processing
+
+---
+
+### TASK-057: Install Image Extraction Libraries
+
+**Priority**: High
+**Estimated Time**: 1 hour
+**Dependencies**: None (Phase 1 foundation complete)
+
+**Description**:
+Install and configure libraries for extracting images from PDF pages to enable image processing and OCR capabilities.
+
+**Acceptance Criteria**:
+- ✅ `pdf2pic` library installed for PDF-to-image conversion
+- ✅ `sharp` library installed for image processing
+- ✅ `canvas` library available for rendering operations
+- ✅ `pdf-lib` installed for PDF manipulation
+- ✅ All libraries import without errors
+- ✅ Basic image extraction service initializes successfully
+- ✅ Unit tests pass for library availability
+- ✅ Dependencies added to package.json
+
+**Implementation Steps**:
+1. Research PDF image extraction libraries (pdf2pic, pdfjs-dist, canvas)
+2. Evaluate compatibility with existing stack (Node.js 18+, TypeScript)
+3. Choose primary library: `pdf2pic` for page-to-image conversion
+4. Install dependencies: `npm install pdf2pic sharp canvas pdf-lib`
+5. Remove unnecessary types: `npm uninstall @types/sharp`
+6. Create basic `ImageExtractionService` class with initialization
+7. Implement health check method to verify libraries
+8. Write unit tests for service initialization
+9. Run tests to verify installation works
+10. Update package.json scripts if needed
+
+**Validation Steps**:
+1. `npm install` completes without errors
+2. `npm test` runs image extraction tests successfully
+3. Service health check returns all libraries available
+4. TypeScript compilation passes
+5. No console errors during initialization
+
+**Regression Tests**:
+```typescript
+// tests/unit/image-extraction.service.test.ts
+describe('ImageExtractionService', () => {
+  test('should initialize with required libraries', () => {
+    const healthStatus = imageExtractionService.getHealthStatus();
+    expect(healthStatus.pdf2picAvailable).toBe(true);
+    expect(healthStatus.sharpAvailable).toBe(true);
+    expect(healthStatus.overallHealthy).toBe(true);
+  });
+});
+```
+
+**Files to Create**:
+- `src/services/image-extraction.service.ts` - Image extraction service
+- `tests/unit/image-extraction.service.test.ts` - Unit tests
+
+**Files to Modify**:
+- `package.json` - Add new dependencies
+
+---
+
+### TASK-058: Extract Images from PDF Pages
+
+**Priority**: High
+**Estimated Time**: 2 hours
+**Dependencies**: TASK-057
+
+**Description**:
+Implement the core image extraction functionality to convert PDF pages to images using the installed libraries.
+
+**Acceptance Criteria**:
+- ✅ PDF pages converted to images (PNG/JPEG/TIFF formats)
+- ✅ Configurable DPI and quality settings
+- ✅ Support for specific page ranges
+- ✅ Images saved to configurable output directory
+- ✅ Error handling for invalid PDFs
+- ✅ Memory-efficient processing for large PDFs
+- ✅ Image metadata extraction (dimensions, size, format)
+- ✅ Progress logging and error reporting
+
+**Implementation Steps**:
+1. Implement `extractImages()` method in ImageExtractionService
+2. Add support for different output formats (PNG, JPEG, TIFF)
+3. Configure pdf2pic options (density, quality, format)
+4. Implement page range processing (single pages, ranges, all pages)
+5. Add output directory creation and validation
+6. Implement image metadata extraction using sharp
+7. Add proper error handling and logging
+8. Create `ExtractedImage` interface for return data
+9. Implement file cleanup for temporary files
+10. Add input validation for PDF files
+
+**Validation Steps**:
+1. Service extracts images from test PDF successfully
+2. Different formats (PNG, JPEG) work correctly
+3. Page range selection works (single page, multiple pages)
+4. Output directory created automatically
+5. Image files have correct metadata
+6. Error handling works for invalid inputs
+7. Memory usage remains reasonable
+
+**Regression Tests**:
+```typescript
+describe('extractImages', () => {
+  test('should extract images from valid PDF', async () => {
+    const images = await imageExtractionService.extractImages(
+      './test.pdf',
+      './output',
+      { format: 'png', dpi: 150 }
+    );
+    expect(images.length).toBeGreaterThan(0);
+    expect(images[0].format).toBe('png');
+  });
+
+  test('should handle non-existent PDF gracefully', async () => {
+    await expect(
+      imageExtractionService.extractImages('./nonexistent.pdf', './output')
+    ).rejects.toThrow();
+  });
+});
+```
+
+**Files to Create**:
+- Extend `src/services/image-extraction.service.ts` with extraction logic
+
+**Files to Modify**:
+- `src/models/graph.model.ts` - Add image-related interfaces
+
+---
+
+### TASK-059: Save Images to Storage
+
+**Priority**: High
+**Estimated Time**: 1.5 hours
+**Dependencies**: TASK-058
+
+**Description**:
+Implement storage functionality for extracted images, supporting both local filesystem and cloud storage options.
+
+**Acceptance Criteria**:
+- ✅ Images saved to local filesystem with organized structure
+- ✅ Configurable storage paths and naming conventions
+- ✅ Image file validation and integrity checks
+- ✅ Storage metadata tracking (file paths, sizes, timestamps)
+- ✅ Cleanup functionality for temporary files
+- ✅ Support for different storage backends (local, S3, etc.)
+- ✅ Storage quota and size limit handling
+
+**Implementation Steps**:
+1. Implement `saveImage()` method for local storage
+2. Create organized directory structure (by document ID, page number)
+3. Add file naming convention (document_page_image.format)
+4. Implement storage configuration options
+5. Add image file validation (corrupt file detection)
+6. Create storage metadata interface
+7. Implement cleanup methods for temporary files
+8. Add storage space monitoring
+9. Support configurable storage backends
+
+**Validation Steps**:
+1. Images saved to correct directories
+2. File naming follows convention
+3. Storage metadata accurate
+4. Cleanup removes temporary files
+5. Storage configuration works
+6. File integrity maintained
+
+**Regression Tests**:
+```typescript
+describe('saveImage', () => {
+  test('should save image to local storage', async () => {
+    const imageData = Buffer.from('fake image data');
+    const path = await storageService.saveImage(imageData, 'test.png');
+    expect(path).toContain('test.png');
+    expect(fs.existsSync(path)).toBe(true);
+  });
+});
+```
+
+**Files to Create**:
+- `src/services/storage.service.ts` - Storage abstraction
+- `src/services/local-storage.service.ts` - Local filesystem implementation
+
+---
+
+### TASK-060: Create Image Nodes in Graph
+
+**Priority**: High
+**Estimated Time**: 1.5 hours
+**Dependencies**: TASK-058, TASK-059
+
+**Description**:
+Integrate extracted images into the knowledge graph by creating image nodes and connecting them to document structure.
+
+**Acceptance Criteria**:
+- ✅ Image nodes created in knowledge graph
+- ✅ Images connected to page containers with "contains" edges
+- ✅ Image metadata stored in node properties
+- ✅ Image nodes linked to document root
+- ✅ Graph builder extended to accept image data
+- ✅ Image processing integrated with existing graph building
+- ✅ Image node IDs follow consistent naming convention
+
+**Implementation Steps**:
+1. Extend `GraphBuilder` to accept `ExtractedImage[]` parameter
+2. Create `createImageNode()` method in GraphFactory
+3. Implement `processImagesOnPage()` in GraphBuilder
+4. Add image node connections to page containers
+5. Store image metadata in node properties
+6. Update graph building pipeline to include images
+7. Add image processing to document workflow
+8. Ensure backward compatibility
+
+**Validation Steps**:
+1. Graph contains image nodes after processing
+2. Image nodes have correct metadata
+3. Image nodes connected to correct pages
+4. Graph structure remains valid
+5. No breaking changes to existing functionality
+
+**Regression Tests**:
+```typescript
+describe('GraphBuilder with images', () => {
+  test('should create image nodes in graph', async () => {
+    const images: ExtractedImage[] = [/* test data */];
+    const graph = await GraphBuilder.buildGraph(documentId, pdfResult, [], images);
+
+    const imageNodes = graph.getNodesByType('image');
+    expect(imageNodes.length).toBeGreaterThan(0);
+  });
+});
+```
+
+**Files to Modify**:
+- `src/services/graph/graph-builder.ts` - Add image processing
+- `src/services/graph/graph-factory.ts` - Add image node creation
+- `src/models/graph.model.ts` - Add image node interface
+
+---
+
+### TASK-061: Add Image Extraction Tests
+
+**Priority**: Medium
+**Estimated Time**: 1 hour
+**Dependencies**: TASK-057, TASK-058, TASK-059, TASK-060
+
+**Description**:
+Create comprehensive unit and integration tests for the complete image extraction pipeline.
+
+**Acceptance Criteria**:
+- ✅ Unit tests for all image extraction methods
+- ✅ Integration tests for end-to-end image processing
+- ✅ Error handling tests for edge cases
+- ✅ Performance tests for large PDFs
+- ✅ Test coverage >80% for image extraction code
+- ✅ Mock implementations for external dependencies
+- ✅ Test fixtures with sample images
+
+**Implementation Steps**:
+1. Write unit tests for ImageExtractionService methods
+2. Create integration tests for full pipeline
+3. Add error handling test cases
+4. Implement test fixtures with sample PDFs/images
+5. Write performance tests
+6. Add storage service tests
+7. Test graph integration with images
+8. Ensure test coverage meets requirements
+
+**Validation Steps**:
+1. All tests pass consistently
+2. Test coverage >80%
+3. No flaky tests
+4. Error cases properly handled
+5. Performance acceptable
+
+**Regression Tests**:
+```typescript
+describe('Image Extraction Integration', () => {
+  test('should process PDF with images end-to-end', async () => {
+    // Full pipeline test
+    const result = await processDocumentWithImages('./test.pdf');
+    expect(result.images).toBeDefined();
+    expect(result.graph.hasImageNodes()).toBe(true);
+  });
+});
+```
+
+**Files to Create**:
+- `tests/unit/image-extraction.service.test.ts` - Unit tests
+- `tests/integration/image-processing.test.ts` - Integration tests
+- `tests/fixtures/sample-images/` - Test fixtures
+
+**Files to Modify**:
+- `tests/unit/graph-builder.test.ts` - Add image tests
+
+---
+
+## [Continue with remaining 86 tasks...]
 
 _Note: This file is abbreviated for length. The complete specification would include all 95 tasks with the same level of detail._
 

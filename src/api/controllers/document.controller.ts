@@ -4,10 +4,12 @@
  */
 
 import { Request, Response } from 'express';
+import * as fs from 'fs';
 import { documentService } from '../../services/document.service';
 import { pdfParserService } from '../../services/pdf-parser.service';
 import { GraphBuilder } from '../../services/graph/graph-builder';
 import { summarizationService } from '../../services/llm/summarization.service';
+import { imageExtractionService, ExtractedImage } from '../../services/image-extraction.service';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 import {
@@ -16,6 +18,9 @@ import {
   DocumentQueryParams,
   DocumentIdParams,
   SummarizationOptions,
+  DocumentQuerySchema,
+  DocumentIdParamSchema,
+  SummarizationOptionsSchema,
   validateRequestBody,
   validateQueryParams,
   validatePathParams,
@@ -79,7 +84,7 @@ export class DocumentController {
       const document = await documentService.createDocument(documentInput);
 
       // Start background processing
-      this.processDocumentAsync(document.id, file.path, userId);
+      this.processDocumentAsync(document.id, file.path, file.originalname, userId);
 
       res.status(201).json({
         success: true,
@@ -116,7 +121,7 @@ export class DocumentController {
   public async getDocuments(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const queryParams: DocumentQueryParams = req.validatedQuery || validateQueryParams(DocumentQueryParams, req.query);
+      const queryParams: DocumentQueryParams = req.validatedQuery || validateQueryParams(DocumentQuerySchema, req.query);
 
       const options = {
         userId,
@@ -167,7 +172,7 @@ export class DocumentController {
   public async getDocumentById(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParams, req.params);
+      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
 
       const document = await documentService.validateDocumentAccess(params.id, userId);
 
@@ -216,7 +221,7 @@ export class DocumentController {
   public async deleteDocument(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParams, req.params);
+      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
 
       // Verify document exists and user has access
       await documentService.validateDocumentAccess(params.id, userId);
@@ -299,8 +304,8 @@ export class DocumentController {
   public async summarizeDocument(req: Request, res: Response): Promise<void> {
     try {
       const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParams, req.params);
-      const options: SummarizationOptions = req.validatedBody || validateRequestBody(SummarizationOptions, req.body);
+      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
+      const options: SummarizationOptions = req.validatedBody || validateRequestBody(SummarizationOptionsSchema, req.body);
 
       // Verify document exists and has graph data
       const document = await documentService.validateDocumentAccess(params.id, userId);
@@ -379,6 +384,7 @@ export class DocumentController {
   private async processDocumentAsync(
     documentId: string,
     filePath: string,
+    fileName: string,
     userId?: string
   ): Promise<void> {
     // Run in background to not block the response
@@ -390,16 +396,33 @@ export class DocumentController {
         await documentService.updateDocumentStatus(documentId, 'processing', undefined, userId);
 
         // Parse PDF
-        const pdfResult = await pdfParserService.parsePDF(filePath);
+        const fileBuffer = await fs.promises.readFile(filePath);
+        const pdfResult = await pdfParserService.parsePDF(fileBuffer, fileName);
         logger.info('PDF parsed successfully', {
           documentId,
           pages: pdfResult.pages.length,
-          totalChars: pdfResult.text.length
+          totalChars: pdfResult.fullText.length
         });
 
+        // Extract images from PDF
+        let images: ExtractedImage[] = [];
+        try {
+          const outputDir = `./data/images/${documentId}`;
+          images = await imageExtractionService.extractImages(filePath, outputDir);
+          logger.info('Images extracted successfully', {
+            documentId,
+            imageCount: images.length
+          });
+        } catch (error: any) {
+          logger.warn('Image extraction failed, continuing without images', {
+            documentId,
+            error: error.message
+          });
+          // Continue processing even if image extraction fails
+        }
+
         // Build graph
-        const graphBuilder = new GraphBuilder();
-        const graph = await graphBuilder.buildGraph(documentId, pdfResult);
+        const graph = await GraphBuilder.buildGraph(documentId, pdfResult, undefined, images);
         logger.info('Graph built successfully', {
           documentId,
           nodes: graph.nodes.length,

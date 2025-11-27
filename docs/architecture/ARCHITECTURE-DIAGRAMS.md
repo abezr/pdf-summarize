@@ -30,7 +30,7 @@ graph TB
     PostgreSQL[(🗄️ PostgreSQL<br/>Document Metadata)]
     Redis[(⚡ Redis<br/>Graph Cache)]
     S3[(📦 S3/GCS<br/>PDF Storage)]
-    Prometheus[📊 Prometheus<br/>Metrics + Quota Status)]
+    Prometheus[📊 Prometheus<br/>Metrics + Quota Status]
     Grafana[📈 Grafana<br/>Dashboards]
     
     User -->|Upload PDF<br/>View Summaries| System

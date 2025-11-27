@@ -553,3 +553,196 @@ Feature specifications and requirements.
 ---
 
 **🤖 Happy Coding, AI Agent!**
+
+---
+
+## 🏠 Local-First Architecture (NEW)
+
+### **IMPORTANT: This project is designed for local deployment**
+
+The architecture has been updated to run entirely on localhost with minimal external dependencies.
+
+**Key Documents:**
+
+1. **[`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md)** ⭐ **MUST READ**
+   - Complete local-first architecture specification
+   - Zero external services (except LLM APIs)
+   - All local alternatives (SQLite, node-cache, filesystem)
+   - $0 infrastructure costs
+   - **When to use:** Understanding the new local-first approach
+
+2. **[`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md)** 💰 **CRITICAL**
+   - Extreme token cost optimization strategies
+   - 90-98% cost reduction techniques
+   - Aggressive caching implementation
+   - Content reduction pipeline
+   - Smart model selection
+   - **When to use:** Implementing cost-optimized LLM usage
+
+### Task: "Implement Local-First Architecture"
+
+**Required Reading:**
+1. [`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md) - Complete specification
+2. [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md) - Cost optimization
+3. [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md) - LLM provider system
+
+**Key Changes from Cloud Architecture:**
+
+| Component | Cloud Version | Local-First Version |
+|-----------|---------------|---------------------|
+| **Database** | PostgreSQL (cloud) | SQLite (file-based) |
+| **Cache** | Redis (cloud) | node-cache (in-memory) |
+| **Storage** | S3/GCS | Local filesystem |
+| **Embeddings** | OpenAI API | transformers.js (local) |
+| **OCR** | Google Vision API | Tesseract.js (local) |
+| **Monitoring** | Prometheus/Grafana | JSON logs + CLI dashboard |
+
+**Implementation Steps:**
+
+1. **Replace PostgreSQL with SQLite**
+   ```typescript
+   import Database from 'better-sqlite3';
+   
+   const db = new Database('./data/database.sqlite');
+   ```
+
+2. **Replace Redis with node-cache**
+   ```typescript
+   import NodeCache from 'node-cache';
+   
+   const cache = new NodeCache({ stdTTL: 3600 });
+   ```
+
+3. **Use Local Filesystem for Files**
+   ```typescript
+   const uploadDir = './data/uploads';
+   const graphDir = './data/graphs';
+   ```
+
+4. **Implement Local Embeddings**
+   ```typescript
+   import { pipeline } from '@xenova/transformers';
+   
+   const embedder = await pipeline('feature-extraction', 
+     'Xenova/all-MiniLM-L6-v2');
+   ```
+
+5. **Add Aggressive Token Caching**
+   ```typescript
+   // See TOKEN-OPTIMIZATION.md for complete implementation
+   const cacheManager = new CacheManager();
+   const result = await cacheManager.getOrGenerate(content, provider, model, generator);
+   ```
+
+**Cost Comparison:**
+
+- **Before (Cloud)**: $80-290/month
+- **After (Local-First)**: $5-20/month (only LLM API)
+- **Savings**: 75-95% reduction! 🎉
+
+---
+
+## 💰 Token Optimization (CRITICAL)
+
+### **Every LLM API call costs money - optimize aggressively!**
+
+**Required Reading:**
+- [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md) - Complete optimization guide
+
+**7 Optimization Strategies:**
+
+1. **Aggressive Caching** (60-80% savings)
+   - Memory cache → Disk cache → LLM API
+   - Never repeat the same call
+   - 7-day TTL for cached responses
+
+2. **Content Reduction** (50-70% savings)
+   - Remove boilerplate before sending
+   - Extract only key sentences
+   - Deduplicate similar content
+
+3. **Smart Model Selection** (50-90% cost savings)
+   - Use Gemini 1.5 Flash for bulk (55x cheaper than GPT-4o)
+   - Use Gemini 1.5 Pro for normal tasks (3.3x cheaper)
+   - Reserve GPT-4o for critical tasks only
+
+4. **Batch Processing** (20-30% savings)
+   - Group similar documents
+   - Reuse context across batch
+   - Process in single session
+
+5. **Local Pre-Processing** (70-90% token reduction)
+   - Do maximum work locally first
+   - Only send essential context to LLM
+   - Build graphs, embeddings locally
+
+6. **Prompt Optimization** (5-10% savings)
+   - Use concise prompts
+   - Avoid verbose instructions
+   - Structure output requests
+
+7. **Budget Enforcement** (prevent overspending)
+   - Set daily limits (e.g., $1/day)
+   - Track every token used
+   - Alert when limits approached
+   - Stop calls if exceeded
+
+**Expected Combined Savings**: 90-98% cost reduction! 🎉
+
+**Implementation Example:**
+
+```typescript
+// Before optimization
+const summary = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: fullDocumentText }],  // $$$ EXPENSIVE
+});
+// Cost: $0.025 per document
+
+// After optimization
+const optimizedContent = contentOptimizer.optimize(documentText);
+const cachedResult = await cacheManager.getOrGenerate(
+  optimizedContent,
+  'google',
+  'gemini-1.5-flash',
+  () => generateSummary(optimizedContent)
+);
+// Cost: $0.0005 per document (50x cheaper!)
+```
+
+---
+
+## 🎯 Updated Quick Start for Local-First
+
+### **When starting work on local-first features:**
+
+1. **Architecture Understanding:**
+   - Read [`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md)
+   - Understand zero-external-dependency philosophy
+   - Review local alternatives to cloud services
+
+2. **Cost Optimization:**
+   - Read [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md)
+   - Implement aggressive caching
+   - Use smart model selection
+
+3. **LLM Integration:**
+   - Use [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md)
+   - Prefer Gemini 1.5 Flash for cost
+   - Cache every LLM response
+
+4. **Local Storage:**
+   - Use SQLite, not PostgreSQL
+   - Use node-cache, not Redis
+   - Store files locally, not S3/GCS
+
+5. **Monitoring:**
+   - Track token usage meticulously
+   - Set daily budget limits
+   - Alert on high costs
+
+---
+
+**Last Updated**: 2025-11-27  
+**New Features**: Local-First Architecture + Token Optimization  
+**Repository**: https://github.com/abezr/pdf-summarize

@@ -4,7 +4,7 @@
  */
 
 // Export interfaces and types
-export type { 
+export type {
   ILLMProvider,
   LLMMessage,
   MessageContent,
@@ -21,7 +21,13 @@ export { GoogleProvider } from './GoogleProvider';
 export { llmProviderManager, type LLMProviderType } from './LLMProviderManager';
 
 // Export quota management
-export { quotaManager, QuotaManager, type TaskPurpose, type ModelQuotaLimits, type ModelQuota } from './QuotaManager';
+export {
+  quotaManager,
+  QuotaManager,
+  type TaskPurpose,
+  type ModelQuotaLimits,
+  type ModelQuota,
+} from './QuotaManager';
 
 // Import for convenience exports
 import { llmProviderManager } from './LLMProviderManager';

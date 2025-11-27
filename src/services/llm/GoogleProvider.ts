@@ -4,7 +4,12 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
+import {
+  ILLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VisionRequest,
+} from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 import { quotaManager, QuotaManager, TaskPurpose } from './QuotaManager';
@@ -20,7 +25,7 @@ export class GoogleProvider implements ILLMProvider {
     'gemini-pro',
     'gemini-pro-vision',
   ];
-  
+
   private client: GoogleGenerativeAI | null = null;
   private apiKey: string | null = null;
   private enableQuotaManagement: boolean;
@@ -28,8 +33,9 @@ export class GoogleProvider implements ILLMProvider {
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || null;
     // Enable quota management by default (disable with GOOGLE_QUOTA_MANAGEMENT=false)
-    this.enableQuotaManagement = process.env.GOOGLE_QUOTA_MANAGEMENT !== 'false';
-    
+    this.enableQuotaManagement =
+      process.env.GOOGLE_QUOTA_MANAGEMENT !== 'false';
+
     if (this.apiKey) {
       this.client = new GoogleGenerativeAI(this.apiKey);
       logger.info('Google AI provider initialized', {
@@ -51,37 +57,36 @@ export class GoogleProvider implements ILLMProvider {
     }
 
     const startTime = Date.now();
-    
+
     // Intelligent model selection based on quota management
     let modelName: string;
     if (this.enableQuotaManagement && !request.model) {
       // Auto-select model based on task purpose and available quota
       const purpose = this.inferTaskPurpose(request);
       const inputText = JSON.stringify(request.messages);
-      const estimatedTokens = QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
-      
-      try {
-        modelName = quotaManager.selectModel(purpose, estimatedTokens);
-        logger.info('Model auto-selected by quota manager', { 
-          purpose, 
-          model: modelName,
-          estimatedTokens,
-        });
-      } catch (error) {
-        // If all models exhausted, throw the error
-        throw error;
-      }
+      const estimatedTokens =
+        QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
+
+      modelName = quotaManager.selectModel(purpose, estimatedTokens);
+      logger.info('Model auto-selected by quota manager', {
+        purpose,
+        model: modelName,
+        estimatedTokens,
+      });
     } else {
       // Use explicitly requested model or fallback to default
       modelName = request.model || 'gemini-1.5-flash';
-      
+
       // Check quota even for explicit model requests
       if (this.enableQuotaManagement) {
         const inputText = JSON.stringify(request.messages);
-        const estimatedTokens = QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
-        
+        const estimatedTokens =
+          QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
+
         if (!quotaManager.hasAvailableQuota(modelName, estimatedTokens)) {
-          logger.warn(`Requested model ${modelName} has no quota, attempting fallback`);
+          logger.warn(
+            `Requested model ${modelName} has no quota, attempting fallback`
+          );
           const purpose = this.inferTaskPurpose(request);
           modelName = quotaManager.selectModel(purpose, estimatedTokens);
         }
@@ -142,19 +147,26 @@ export class GoogleProvider implements ILLMProvider {
         processingTime,
       };
     } catch (error: any) {
-      logger.error('Google AI text generation failed', { error: error.message });
-      
+      logger.error('Google AI text generation failed', {
+        error: error.message,
+      });
+
       if (error.message?.includes('API key')) {
         throw new AppError('Invalid Google API key', 401);
       }
-      if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+      if (
+        error.message?.includes('quota') ||
+        error.message?.includes('rate limit')
+      ) {
         throw new AppError('Google AI quota exceeded', 429, {
           message: 'Daily quota exhausted. Please try again tomorrow.',
           resetTime: quotaManager.getQuotaStatus().nextReset,
         });
       }
-      
-      throw new AppError('Google AI request failed', 500, { originalError: error });
+
+      throw new AppError('Google AI request failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -163,28 +175,37 @@ export class GoogleProvider implements ILLMProvider {
    */
   private inferTaskPurpose(request: LLMRequest): TaskPurpose {
     const messagesText = JSON.stringify(request.messages).toLowerCase();
-    
+
     // Check for keywords to determine purpose
-    if (messagesText.includes('summarize') || messagesText.includes('summary')) {
+    if (
+      messagesText.includes('summarize') ||
+      messagesText.includes('summary')
+    ) {
       if (messagesText.length > 10000) return 'bulk-processing';
       return 'quick-summary';
     }
-    
+
     if (messagesText.includes('analyze') || messagesText.includes('analysis')) {
-      if (messagesText.includes('detailed') || messagesText.includes('comprehensive')) {
+      if (
+        messagesText.includes('detailed') ||
+        messagesText.includes('comprehensive')
+      ) {
         return 'detailed-analysis';
       }
       return 'standard-analysis';
     }
-    
-    if (messagesText.includes('critical') || messagesText.includes('important')) {
+
+    if (
+      messagesText.includes('critical') ||
+      messagesText.includes('important')
+    ) {
       return 'critical-task';
     }
-    
+
     // Check request length to determine complexity
     if (messagesText.length > 20000) return 'detailed-analysis';
     if (messagesText.length < 5000) return 'quick-summary';
-    
+
     // Default to standard analysis
     return 'standard-analysis';
   }
@@ -195,13 +216,16 @@ export class GoogleProvider implements ILLMProvider {
     }
 
     const startTime = Date.now();
-    
+
     // Select model for vision task based on quota
     let modelName = 'gemini-1.5-pro'; // Default for vision
     if (this.enableQuotaManagement) {
       const estimatedTokens = this.estimateTokens(request.prompt) + 1000; // Image + response tokens
       try {
-        modelName = quotaManager.selectModel('vision-analysis', estimatedTokens);
+        modelName = quotaManager.selectModel(
+          'vision-analysis',
+          estimatedTokens
+        );
         // Ensure selected model supports vision
         if (!modelName.includes('flash') && !modelName.includes('pro')) {
           modelName = 'gemini-1.5-flash'; // Fallback to flash for vision
@@ -212,7 +236,9 @@ export class GoogleProvider implements ILLMProvider {
     }
 
     try {
-      logger.info('Analyzing image with Google AI Vision', { model: modelName });
+      logger.info('Analyzing image with Google AI Vision', {
+        model: modelName,
+      });
 
       const model = this.client.getGenerativeModel({ model: modelName });
 
@@ -260,16 +286,23 @@ export class GoogleProvider implements ILLMProvider {
         processingTime,
       };
     } catch (error: any) {
-      logger.error('Google AI vision analysis failed', { error: error.message });
-      
-      if (error.message?.includes('quota') || error.message?.includes('rate limit')) {
+      logger.error('Google AI vision analysis failed', {
+        error: error.message,
+      });
+
+      if (
+        error.message?.includes('quota') ||
+        error.message?.includes('rate limit')
+      ) {
         throw new AppError('Google AI quota exceeded', 429, {
           message: 'Daily quota exhausted. Please try again tomorrow.',
           resetTime: quotaManager.getQuotaStatus().nextReset,
         });
       }
-      
-      throw new AppError('Google AI vision analysis failed', 500, { originalError: error });
+
+      throw new AppError('Google AI vision analysis failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -277,44 +310,48 @@ export class GoogleProvider implements ILLMProvider {
     // Convert OpenAI message format to Gemini format
     const contents: any[] = [];
     let systemMessage = '';
-    
+
     for (const message of messages) {
       if (message.role === 'system') {
         // Gemini doesn't have system role, save it to prepend to first user message
-        systemMessage = typeof message.content === 'string' ? message.content : '';
+        systemMessage =
+          typeof message.content === 'string' ? message.content : '';
         continue;
       }
 
       const role = message.role === 'assistant' ? 'model' : 'user';
-      
+
       if (typeof message.content === 'string') {
         let text = message.content;
         // Prepend system message to first user message
         if (role === 'user' && systemMessage && contents.length === 0) {
           text = `${systemMessage}\n\n${text}`;
         }
-        
+
         contents.push({
           role,
           parts: [{ text }],
         });
       } else if (Array.isArray(message.content)) {
         // Handle multimodal content
-        const parts = message.content.map((part: any) => {
-          if (part.type === 'text') {
-            return { text: part.text };
-          } else if (part.type === 'image_url') {
-            // Extract base64 from data URL
-            const base64 = part.image_url.url.split(',')[1] || part.image_url.url;
-            return {
-              inlineData: {
-                data: base64,
-                mimeType: 'image/png',
-              },
-            };
-          }
-          return null;
-        }).filter(Boolean);
+        const parts = message.content
+          .map((part: any) => {
+            if (part.type === 'text') {
+              return { text: part.text };
+            } else if (part.type === 'image_url') {
+              // Extract base64 from data URL
+              const base64 =
+                part.image_url.url.split(',')[1] || part.image_url.url;
+              return {
+                inlineData: {
+                  data: base64,
+                  mimeType: 'image/png',
+                },
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
 
         contents.push({ role, parts });
       }
@@ -343,16 +380,18 @@ export class GoogleProvider implements ILLMProvider {
     const modelPricing = pricing[model] || pricing['gemini-1.5-flash'];
     const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
     const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
-    
+
     return inputCost + outputCost;
   }
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;
-    
+
     try {
       // Use cheapest model for health check
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash-8b' });
+      const model = this.client.getGenerativeModel({
+        model: 'gemini-1.5-flash-8b',
+      });
       await model.generateContent('Hello');
       return true;
     } catch (error) {
@@ -371,7 +410,7 @@ export class GoogleProvider implements ILLMProvider {
         message: 'Quota management is disabled',
       };
     }
-    
+
     return {
       enabled: true,
       ...quotaManager.getQuotaStatus(),

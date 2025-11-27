@@ -1,7 +1,7 @@
 /**
  * Google Gemini Quota Manager
  * Tracks daily token usage and manages model selection based on available quota
- * 
+ *
  * Features:
  * - Per-model daily quota tracking
  * - Intelligent model selection by task purpose
@@ -17,9 +17,9 @@ import { AppError } from '../../utils/errors';
  * Source: https://ai.google.dev/gemini-api/docs/rate-limits
  */
 export interface ModelQuotaLimits {
-  rpm: number;  // Requests per minute
-  tpm: number;  // Tokens per minute
-  rpd: number;  // Requests per day
+  rpm: number; // Requests per minute
+  tpm: number; // Tokens per minute
+  rpd: number; // Requests per day
 }
 
 export interface ModelQuota {
@@ -32,13 +32,13 @@ export interface ModelQuota {
   };
 }
 
-export type TaskPurpose = 
-  | 'bulk-processing'      // Large volume, simple tasks → Flash-Lite
-  | 'quick-summary'        // Fast summaries → Flash
-  | 'standard-analysis'    // Normal analysis → Flash or Pro
-  | 'detailed-analysis'    // Complex reasoning → Pro
-  | 'vision-analysis'      // OCR/Image → Flash/Pro Vision
-  | 'critical-task';       // Must succeed → Pro (highest quality)
+export type TaskPurpose =
+  | 'bulk-processing' // Large volume, simple tasks → Flash-Lite
+  | 'quick-summary' // Fast summaries → Flash
+  | 'standard-analysis' // Normal analysis → Flash or Pro
+  | 'detailed-analysis' // Complex reasoning → Pro
+  | 'vision-analysis' // OCR/Image → Flash/Pro Vision
+  | 'critical-task'; // Must succeed → Pro (highest quality)
 
 /**
  * Google Gemini Model Quotas (Free Tier as of 2024)
@@ -76,11 +76,31 @@ export const GEMINI_FREE_TIER_LIMITS: Record<string, ModelQuotaLimits> = {
  * Model recommendations by task purpose
  */
 const MODEL_RECOMMENDATIONS: Record<TaskPurpose, string[]> = {
-  'bulk-processing': ['gemini-1.5-flash-8b', 'gemini-2.0-flash-exp', 'gemini-1.5-flash'],
-  'quick-summary': ['gemini-2.0-flash-exp', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
-  'standard-analysis': ['gemini-1.5-flash', 'gemini-2.0-flash-exp', 'gemini-1.5-pro'],
-  'detailed-analysis': ['gemini-1.5-pro', 'gemini-exp-1206', 'gemini-1.5-flash'],
-  'vision-analysis': ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'],
+  'bulk-processing': [
+    'gemini-1.5-flash-8b',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+  ],
+  'quick-summary': [
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+  ],
+  'standard-analysis': [
+    'gemini-1.5-flash',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-pro',
+  ],
+  'detailed-analysis': [
+    'gemini-1.5-pro',
+    'gemini-exp-1206',
+    'gemini-1.5-flash',
+  ],
+  'vision-analysis': [
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp',
+  ],
   'critical-task': ['gemini-1.5-pro', 'gemini-exp-1206', 'gemini-1.5-flash'],
 };
 
@@ -95,9 +115,10 @@ export class QuotaManager {
   constructor(dailyBudget?: number) {
     this.quotas = new Map();
     // Default: 1M tokens/day (reasonable for free tier mixed usage)
-    this.dailyBudget = dailyBudget || parseInt(process.env.GOOGLE_DAILY_QUOTA || '1000000', 10);
+    this.dailyBudget =
+      dailyBudget || parseInt(process.env.GOOGLE_DAILY_QUOTA || '1000000', 10);
     this.currentDayKey = this.getDayKey();
-    
+
     this.initializeQuotas();
     logger.info('QuotaManager initialized', {
       dailyBudget: this.dailyBudget,
@@ -130,8 +151,10 @@ export class QuotaManager {
     // Convert to Pacific Time (UTC-8 or UTC-7 for DST)
     const pacificOffset = -8 * 60; // Minutes
     const utcOffset = now.getTimezoneOffset();
-    const pacificTime = new Date(now.getTime() + (utcOffset + pacificOffset) * 60 * 1000);
-    
+    const pacificTime = new Date(
+      now.getTime() + (utcOffset + pacificOffset) * 60 * 1000
+    );
+
     return pacificTime.toISOString().split('T')[0];
   }
 
@@ -165,9 +188,12 @@ export class QuotaManager {
   /**
    * Check if a model has available quota
    */
-  public hasAvailableQuota(model: string, estimatedTokens: number = 1000): boolean {
+  public hasAvailableQuota(
+    model: string,
+    estimatedTokens: number = 1000
+  ): boolean {
     this.checkAndResetIfNeeded();
-    
+
     const quota = this.quotas.get(model);
     if (!quota) {
       logger.warn(`Model ${model} not found in quota tracker`);
@@ -200,11 +226,16 @@ export class QuotaManager {
   /**
    * Select the best available model for a task purpose
    */
-  public selectModel(purpose: TaskPurpose, estimatedTokens: number = 1000): string {
+  public selectModel(
+    purpose: TaskPurpose,
+    estimatedTokens: number = 1000
+  ): string {
     this.checkAndResetIfNeeded();
 
-    const recommendations = MODEL_RECOMMENDATIONS[purpose] || MODEL_RECOMMENDATIONS['standard-analysis'];
-    
+    const recommendations =
+      MODEL_RECOMMENDATIONS[purpose] ||
+      MODEL_RECOMMENDATIONS['standard-analysis'];
+
     logger.info('Selecting model for task', {
       purpose,
       estimatedTokens,
@@ -297,12 +328,14 @@ export class QuotaManager {
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(0, 0, 0, 0);
-    
+
     // Adjust to Pacific Time
     const pacificOffset = -8 * 60; // Minutes
     const utcOffset = tomorrow.getTimezoneOffset();
-    const resetTime = new Date(tomorrow.getTime() + (utcOffset + pacificOffset) * 60 * 1000);
-    
+    const resetTime = new Date(
+      tomorrow.getTime() + (utcOffset + pacificOffset) * 60 * 1000
+    );
+
     return resetTime;
   }
 
@@ -315,7 +348,10 @@ export class QuotaManager {
     const status: any = {
       dailyBudget: this.dailyBudget,
       totalUsed: this.getTotalTokensUsedToday(),
-      percentUsed: ((this.getTotalTokensUsedToday() / this.dailyBudget) * 100).toFixed(2),
+      percentUsed: (
+        (this.getTotalTokensUsedToday() / this.dailyBudget) *
+        100
+      ).toFixed(2),
       nextReset: this.getNextResetTime().toISOString(),
       models: {},
     };
@@ -353,7 +389,10 @@ export class QuotaManager {
    * Get model recommendations for a purpose
    */
   public getRecommendedModels(purpose: TaskPurpose): string[] {
-    return MODEL_RECOMMENDATIONS[purpose] || MODEL_RECOMMENDATIONS['standard-analysis'];
+    return (
+      MODEL_RECOMMENDATIONS[purpose] ||
+      MODEL_RECOMMENDATIONS['standard-analysis']
+    );
   }
 }
 

@@ -11,7 +11,7 @@ export class AppError extends Error {
     this.name = 'AppError';
     this.statusCode = statusCode;
     this.metadata = metadata;
-    
+
     // Maintains proper stack trace for where our error was thrown
     Error.captureStackTrace(this, this.constructor);
   }

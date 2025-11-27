@@ -3,7 +3,12 @@
  * Manages multiple LLM providers with auto-detection and fallback
  */
 
-import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
+import {
+  ILLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VisionRequest,
+} from './ILLMProvider';
 import { OpenAIProvider } from './OpenAIProvider';
 import { GoogleProvider } from './GoogleProvider';
 import { logger } from '../../utils/logger';
@@ -22,13 +27,14 @@ class LLMProviderManager {
 
   constructor() {
     this.providers = new Map();
-    this.preferredProvider = (process.env.LLM_PROVIDER as LLMProviderType) || 'auto';
+    this.preferredProvider =
+      (process.env.LLM_PROVIDER as LLMProviderType) || 'auto';
     this.enableFallback = process.env.LLM_ENABLE_FALLBACK !== 'false';
-    
+
     // Initialize providers
     this.registerProvider(new OpenAIProvider());
     this.registerProvider(new GoogleProvider());
-    
+
     this.logAvailableProviders();
   }
 
@@ -40,7 +46,9 @@ class LLMProviderManager {
     if (provider.isAvailable) {
       logger.info(`LLM provider registered and available: ${provider.name}`);
     } else {
-      logger.warn(`LLM provider registered but not available: ${provider.name}`);
+      logger.warn(
+        `LLM provider registered but not available: ${provider.name}`
+      );
     }
   }
 
@@ -50,10 +58,12 @@ class LLMProviderManager {
   private logAvailableProviders(): void {
     const available = this.getAvailableProviders();
     if (available.length === 0) {
-      logger.error('⚠️  No LLM providers available! Please configure API keys (OPENAI_API_KEY or GOOGLE_API_KEY).');
+      logger.error(
+        '⚠️  No LLM providers available! Please configure API keys (OPENAI_API_KEY or GOOGLE_API_KEY).'
+      );
     } else {
       logger.info('✅ Available LLM providers', {
-        providers: available.map(p => p.name),
+        providers: available.map((p) => p.name),
         preferred: this.preferredProvider,
         fallbackEnabled: this.enableFallback,
       });
@@ -64,7 +74,7 @@ class LLMProviderManager {
    * Get all available providers (with configured API keys)
    */
   public getAvailableProviders(): ILLMProvider[] {
-    return Array.from(this.providers.values()).filter(p => p.isAvailable);
+    return Array.from(this.providers.values()).filter((p) => p.isAvailable);
   }
 
   /**
@@ -79,11 +89,14 @@ class LLMProviderManager {
     if (providerType === 'auto') {
       const available = this.getAvailableProviders();
       if (available.length === 0) {
-        throw new AppError('No LLM providers available. Please configure OPENAI_API_KEY or GOOGLE_API_KEY.', 503);
+        throw new AppError(
+          'No LLM providers available. Please configure OPENAI_API_KEY or GOOGLE_API_KEY.',
+          503
+        );
       }
-      
+
       // Prefer OpenAI if available, else use first available
-      const openai = available.find(p => p.name === 'openai');
+      const openai = available.find((p) => p.name === 'openai');
       return openai || available[0];
     }
 
@@ -96,15 +109,23 @@ class LLMProviderManager {
     if (!provider.isAvailable) {
       // Try to fall back to another provider if enabled
       if (this.enableFallback) {
-        logger.warn(`Preferred provider ${providerType} not available, falling back...`);
+        logger.warn(
+          `Preferred provider ${providerType} not available, falling back...`
+        );
         const available = this.getAvailableProviders();
         if (available.length === 0) {
-          throw new AppError(`No LLM providers available. Please configure API keys.`, 503);
+          throw new AppError(
+            `No LLM providers available. Please configure API keys.`,
+            503
+          );
         }
         logger.info(`Falling back to provider: ${available[0].name}`);
         return available[0];
       } else {
-        throw new AppError(`Provider ${providerType} not available and fallback is disabled`, 503);
+        throw new AppError(
+          `Provider ${providerType} not available and fallback is disabled`,
+          503
+        );
       }
     }
 
@@ -122,7 +143,7 @@ class LLMProviderManager {
     providerType?: LLMProviderType
   ): Promise<LLMResponse> {
     const provider = this.getProvider(providerType);
-    
+
     logger.info('Generating text', {
       provider: provider.name,
       model: request.model || 'default',
@@ -134,17 +155,22 @@ class LLMProviderManager {
     } catch (error: any) {
       // If error and fallback enabled, try another provider
       if (this.enableFallback && providerType !== 'auto') {
-        logger.warn(`Provider ${provider.name} failed, attempting fallback...`, {
-          error: error.message,
-        });
-        
-        const available = this.getAvailableProviders().filter(p => p.name !== provider.name);
+        logger.warn(
+          `Provider ${provider.name} failed, attempting fallback...`,
+          {
+            error: error.message,
+          }
+        );
+
+        const available = this.getAvailableProviders().filter(
+          (p) => p.name !== provider.name
+        );
         if (available.length > 0) {
           logger.info(`Falling back to provider: ${available[0].name}`);
           return await available[0].generateText(request);
         }
       }
-      
+
       throw error;
     }
   }
@@ -160,7 +186,7 @@ class LLMProviderManager {
     providerType?: LLMProviderType
   ): Promise<LLMResponse> {
     const provider = this.getProvider(providerType);
-    
+
     logger.info('Analyzing image', {
       provider: provider.name,
       promptLength: request.prompt.length,
@@ -171,17 +197,22 @@ class LLMProviderManager {
     } catch (error: any) {
       // If error and fallback enabled, try another provider
       if (this.enableFallback && providerType !== 'auto') {
-        logger.warn(`Provider ${provider.name} failed, attempting fallback...`, {
-          error: error.message,
-        });
-        
-        const available = this.getAvailableProviders().filter(p => p.name !== provider.name);
+        logger.warn(
+          `Provider ${provider.name} failed, attempting fallback...`,
+          {
+            error: error.message,
+          }
+        );
+
+        const available = this.getAvailableProviders().filter(
+          (p) => p.name !== provider.name
+        );
         if (available.length > 0) {
           logger.info(`Falling back to provider: ${available[0].name}`);
           return await available[0].analyzeImage(request);
         }
       }
-      
+
       throw error;
     }
   }
@@ -192,7 +223,7 @@ class LLMProviderManager {
    */
   public async healthCheck(): Promise<Record<string, boolean>> {
     const results: Record<string, boolean> = {};
-    
+
     for (const [name, provider] of this.providers.entries()) {
       if (provider.isAvailable) {
         results[name] = await provider.healthCheck();
@@ -210,7 +241,7 @@ class LLMProviderManager {
    */
   public getProviderInfo(): any {
     const info: any = {};
-    
+
     for (const [name, provider] of this.providers.entries()) {
       info[name] = {
         available: provider.isAvailable,
@@ -228,7 +259,7 @@ class LLMProviderManager {
     return {
       preferredProvider: this.preferredProvider,
       enableFallback: this.enableFallback,
-      availableProviders: this.getAvailableProviders().map(p => p.name),
+      availableProviders: this.getAvailableProviders().map((p) => p.name),
       totalProviders: this.providers.size,
     };
   }

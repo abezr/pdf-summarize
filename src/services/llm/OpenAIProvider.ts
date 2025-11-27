@@ -4,14 +4,24 @@
  */
 
 import OpenAI from 'openai';
-import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
+import {
+  ILLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VisionRequest,
+} from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 
 export class OpenAIProvider implements ILLMProvider {
   public readonly name = 'openai';
-  public readonly supportedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
-  
+  public readonly supportedModels = [
+    'gpt-4o',
+    'gpt-4-turbo',
+    'gpt-4',
+    'gpt-3.5-turbo',
+  ];
+
   private client: OpenAI | null = null;
   private apiKey: string | null = null;
   private defaultModel: string;
@@ -19,7 +29,7 @@ export class OpenAIProvider implements ILLMProvider {
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || null;
     this.defaultModel = process.env.OPENAI_MODEL || 'gpt-4o';
-    
+
     if (this.apiKey) {
       this.client = new OpenAI({ apiKey: this.apiKey });
       logger.info('OpenAI provider initialized', { model: this.defaultModel });
@@ -79,15 +89,17 @@ export class OpenAIProvider implements ILLMProvider {
       };
     } catch (error: any) {
       logger.error('OpenAI text generation failed', { error: error.message });
-      
+
       if (error.status === 429) {
         throw new AppError('OpenAI rate limit exceeded', 429);
       }
       if (error.status === 401) {
         throw new AppError('Invalid OpenAI API key', 401);
       }
-      
-      throw new AppError('OpenAI request failed', 500, { originalError: error });
+
+      throw new AppError('OpenAI request failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -150,7 +162,9 @@ export class OpenAIProvider implements ILLMProvider {
       };
     } catch (error: any) {
       logger.error('OpenAI vision analysis failed', { error: error.message });
-      throw new AppError('OpenAI vision analysis failed', 500, { originalError: error });
+      throw new AppError('OpenAI vision analysis failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -166,13 +180,13 @@ export class OpenAIProvider implements ILLMProvider {
     const modelPricing = pricing[model] || pricing['gpt-4o'];
     const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
     const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
-    
+
     return inputCost + outputCost;
   }
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;
-    
+
     try {
       await this.client.models.list();
       return true;

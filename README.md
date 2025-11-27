@@ -17,335 +17,188 @@ A sophisticated **document-aware PDF summarization system** that treats document
 
 ---
 
-## 📚 Documentation Index
+## 📚 Documentation Structure
 
-This repository contains **16 comprehensive documents** totaling **9,600+ lines** and **85,000+ words** of technical documentation, plus complete working code implementation:
+**NEW**: Documentation is now organized into logical folders for better navigation!
 
-### 1. 📋 [PROJECT-SUMMARY.md](./PROJECT-SUMMARY.md) - **Start Here**
-**Executive overview for reviewers**
+```
+docs/
+├── architecture/          # System architecture and design
+│   ├── ARCHITECTURE-DIAGRAMS.md      # 11 Mermaid diagrams
+│   ├── C4-ARCHITECTURE.md            # Complete C4 model (4 levels)
+│   └── EVALUATION-PROOF.md           # Automatic quality validation
+│
+├── implementation/        # Implementation guides and code examples
+│   ├── IMPLEMENTATION-GUIDE.md       # Step-by-step build guide
+│   ├── IMPLEMENTATION-ROADMAP.md     # 95-task roadmap
+│   ├── TASK-SPECIFICATIONS.md        # Detailed task specs
+│   ├── EXAMPLE-CODE.md               # Production code samples
+│   └── GROK-IMPLEMENTATION-PROMPT.md # AI agent prompt
+│
+├── guides/               # User and developer guides
+│   ├── QUICK-REFERENCE.md            # One-page cheat sheet
+│   ├── NAVIGATION-GUIDE.md           # How to navigate docs
+│   ├── GIT-INSTRUCTIONS.md           # Git workflow
+│   └── COMPLETE-DELIVERABLES.md      # Full summary
+│
+├── llm/                  # LLM provider implementation ⭐ NEW
+│   ├── MULTI-LLM-SUPPORT.md          # Complete architecture
+│   ├── MULTI-LLM-QUICKSTART.md       # 5-minute quick start
+│   └── MULTI-LLM-IMPLEMENTATION-SUMMARY.md  # Implementation verification
+│
+└── specifications/       # Feature specifications
+    ├── PROJECT-SUMMARY.md            # Executive overview
+    ├── OCR-ENHANCEMENT.md            # OCR for scanned PDFs
+    └── OCR-FREE-TIER-STRATEGY.md     # Cost-optimized OCR
 
-- Executive summary of the architecture
-- Key architectural decisions explained
-- Implementation strategy (Phase 1 vs Phase 2)
-- Job requirements alignment
-- Demo script for Loom recording
-- Technical metrics and statistics
+src/
+└── services/
+    └── llm/              # LLM provider code ⭐ NEW
+        ├── ILLMProvider.ts           # Unified interface
+        ├── OpenAIProvider.ts         # OpenAI implementation
+        ├── GoogleProvider.ts         # Google implementation
+        ├── LLMProviderManager.ts     # Auto-detection & fallback
+        ├── index.ts                  # Exports
+        └── README.md                 # Developer guide
+```
 
-**Best for**: Getting a quick understanding of the entire project
-
----
-
-### 2. ⚡ [QUICK-REFERENCE.md](./QUICK-REFERENCE.md) - **Cheat Sheet**
-**One-page reference guide**
-
-- Core innovation: Graph vs String processing
-- System architecture summary (C4 levels)
-- Graph data model (nodes, edges, structures)
-- MCP pattern explanation
-- Implementation priorities
-- Key algorithms (reference detection, semantic edges, context retrieval)
-- Observability stack (metrics, tracing, evaluation)
-- API quick reference
-- Job alignment checklist
-- Common interview questions
-- Troubleshooting guide
-
-**Best for**: Quick lookup during implementation or interviews
-
----
-
-### 3. 📐 [ARCHITECTURE-DIAGRAMS.md](./ARCHITECTURE-DIAGRAMS.md) - **Visual Guide**
-**11 Mermaid diagrams covering all architecture levels**
-
-1. System Context Diagram
-2. Container Architecture Diagram
-3. Processing Pipeline Flow
-4. Knowledge Graph Structure
-5. MCP Context Retrieval (Sequence)
-6. Evaluation & Observability Flow
-7. Data Flow Diagram
-8. Component Interaction Sequence
-9. Graph Node Relationships (ERD)
-10. Deployment Architecture
-11. Metrics Collection Flow
-
-**Best for**: Visual learners, presentations, understanding data flow
+**Total**: 19 comprehensive documents (18 `.md` + 811 lines of TypeScript code) totaling **9,600+ lines** and **85,000+ words** of documentation, plus complete working code implementation.
 
 ---
 
-### 4. 🏗️ [C4-ARCHITECTURE.md](./C4-ARCHITECTURE.md) - **Complete Architecture**
-**Comprehensive C4 model documentation (4 levels)**
+## 🤖 For AI/LLM Agents
 
-- **Level 1**: System Context (external actors, dependencies)
-- **Level 2**: Container Architecture (Frontend, API, Processing, Evaluation, Data, Monitoring)
-- **Level 3**: Component Architecture (detailed component breakdown)
-- **Level 4**: Code Structure (TypeScript interfaces, 25+ data models)
-- **Knowledge Graph Design**: Node types, edge types, graph construction
-- **Observability Architecture**: Evaluation engine, metrics collection, dashboards
-- **Deployment Architecture**: Docker Compose, CI/CD pipeline
+**New**: [`AGENT.md`](./AGENT.md) - **Comprehensive guide for AI agents maintaining/implementing LLM features**
 
-**Includes**:
-- Complete TypeScript interfaces
-- Graph builder algorithm (~100 lines)
-- MCP context retriever (~70 lines)
-- Evaluation engine (~150 lines)
-- Metrics collector implementation
-- Grafana dashboard definition
+This document provides:
+- Task-specific documentation references
+- Quick start guides for common tasks
+- Implementation patterns and best practices
+- Troubleshooting resources
+- Code organization overview
 
-**Best for**: Deep technical understanding, implementation reference
+**Perfect for**: Claude, GPT-4, Gemini, or any AI agent working on this codebase.
 
 ---
 
-### 5. ✅ [EVALUATION-PROOF.md](./EVALUATION-PROOF.md) - **Automatic Quality Proof**
-**How the system automatically validates summaries**
+## 🚀 Quick Start by Role
 
-- Automatic evaluation pipeline (runs after every summary)
-- RAGAS metrics (faithfulness, relevancy, recall, precision)
-- Custom metrics (grounding score, coverage score, graph utilization)
-- Benchmark metrics (ROUGE, BLEU, semantic similarity)
-- Overall score calculation (weighted average)
-- Automatic decision (approve/reject based on thresholds)
-- Quality badge for users (verified summary indicator)
-- Real-world example with proof statement
+### **For Reviewers** (50 minutes total)
 
-**Best for**: Understanding how the system proves summary quality automatically
-
----
-
-### 6. 🔍 [OCR-ENHANCEMENT.md](./OCR-ENHANCEMENT.md) - **OCR for Scanned PDFs** ⚠️ **CRITICAL**
-**Complete OCR support for scanned documents**
-
-- **Problem Identified**: Current pdf-parse only works with text-based PDFs
-- **Solution**: Hybrid OCR pipeline (Tesseract.js + Google Cloud Vision)
-- **Features**:
-  - Automatic PDF type detection (text vs scanned)
-  - Tesseract.js integration (free, open-source)
-  - Google Cloud Vision API (optional premium)
-  - Confidence scoring per page
-  - Quality validation (reject < 60% confidence)
-- **Architecture**: Enhanced PDF parser with OCR fallback
-- **Implementation**: 6 new tasks for Phase 2.5 (3-4 days)
-- **Performance**: Tesseract (30-60s/10 pages), Google Vision (5-10s/10 pages)
-- **Cost**: Tesseract (free), Google Vision ($0.15/100 pages)
-
-**Best for**: Understanding how to handle scanned PDFs without text layer
+1. **Overview** (5 min): [`docs/specifications/PROJECT-SUMMARY.md`](./docs/specifications/PROJECT-SUMMARY.md) - Executive summary
+2. **Quick Reference** (3 min): [`docs/guides/QUICK-REFERENCE.md`](./docs/guides/QUICK-REFERENCE.md) - Key concepts
+3. **Visual Architecture** (5 min): [`docs/architecture/ARCHITECTURE-DIAGRAMS.md`](./docs/architecture/ARCHITECTURE-DIAGRAMS.md) - 11 diagrams
+4. **Quality System** (5 min): [`docs/architecture/EVALUATION-PROOF.md`](./docs/architecture/EVALUATION-PROOF.md) - Auto validation
+5. **Multi-LLM** (5 min): [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) - OpenAI + Google support
+6. **OCR Support** (5 min): [`docs/specifications/OCR-ENHANCEMENT.md`](./docs/specifications/OCR-ENHANCEMENT.md) - Scanned PDFs
+7. **Deep Dive** (15 min): [`docs/architecture/C4-ARCHITECTURE.md`](./docs/architecture/C4-ARCHITECTURE.md) - Complete design
+8. **Code Examples** (10 min): [`docs/implementation/EXAMPLE-CODE.md`](./docs/implementation/EXAMPLE-CODE.md) - Production code
 
 ---
 
-### 7. 🛠️ [IMPLEMENTATION-GUIDE.md](./IMPLEMENTATION-GUIDE.md) - **Build Guide**
-**Step-by-step implementation instructions**
+### **For Implementers**
 
-- **Phase 1**: Core features (2-3 hours, achievable)
-  - Project setup
-  - PDF parser service
-  - Graph builder service
-  - OpenAI integration
-  - Upload controller
-  - Express server
-  - React frontend
-  - Docker setup
-  - README documentation
-
-- **Phase 2**: Advanced features (demonstration)
-  - Table detection
-  - Reference edge detection
-  - MCP function calling
-  - RAGAS evaluation
-
-**Includes**:
-- Complete code samples (~550 lines)
-- Technology stack setup
-- Testing strategy (unit + integration)
-- Docker configuration files
-- Demo script (5-7 minutes)
-
-**Best for**: Actual implementation, following step-by-step
+1. **Planning** (5 min): [`docs/implementation/IMPLEMENTATION-ROADMAP.md`](./docs/implementation/IMPLEMENTATION-ROADMAP.md) - 95 tasks
+2. **Setup** (2-3 hours): [`docs/implementation/IMPLEMENTATION-GUIDE.md`](./docs/implementation/IMPLEMENTATION-GUIDE.md) - Phase 1 core features
+3. **Code Reference**: [`docs/implementation/EXAMPLE-CODE.md`](./docs/implementation/EXAMPLE-CODE.md) - Copy-paste examples
+4. **Multi-LLM Setup**: [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) - Provider configuration
+5. **OCR Integration**: [`docs/specifications/OCR-ENHANCEMENT.md`](./docs/specifications/OCR-ENHANCEMENT.md) - Phase 2.5
+6. **Troubleshooting**: [`docs/guides/QUICK-REFERENCE.md`](./docs/guides/QUICK-REFERENCE.md) - Common issues
 
 ---
 
-### 8. 📋 [IMPLEMENTATION-ROADMAP.md](./IMPLEMENTATION-ROADMAP.md) - **95 Tasks Roadmap**
-**Detailed implementation roadmap with 95 granular tasks**
+### **For AI Agents**
 
-- Phase 1: Foundation (18 tasks, 5-7 days)
-- Phase 2: Core Features (32 tasks, 10-14 days)
-- Phase 2.5: OCR Integration (6 tasks, 3-4 days) ⚠️ **NEW**
-- Phase 3: Advanced Features (45 tasks, 15-20 days)
-- Dependency graph
-- Milestones and success metrics
-- Testing strategy
-- Deployment plan
-
-**Best for**: Project planning, progress tracking, team coordination
+1. **Start Here**: [`AGENT.md`](./AGENT.md) - Complete AI agent guide
+2. **LLM Quick Start**: [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) - 5-minute setup
+3. **LLM Architecture**: [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md) - Complete design
+4. **Code Guide**: [`src/services/llm/README.md`](./src/services/llm/README.md) - Developer documentation
+5. **Implementation**: [`docs/implementation/GROK-IMPLEMENTATION-PROMPT.md`](./docs/implementation/GROK-IMPLEMENTATION-PROMPT.md) - Autonomous execution
 
 ---
 
-### 9. 📝 [TASK-SPECIFICATIONS.md](./TASK-SPECIFICATIONS.md) - **Detailed Task Specs**
-**Granular specifications for all 95 tasks**
-
-- Each task includes:
-  - Clear title and description
-  - Priority (HIGH/MEDIUM/LOW)
-  - Estimated time
-  - Dependencies
-  - Acceptance criteria (3-5 testable conditions)
-  - Implementation steps (5-10 granular steps)
-  - Validation steps (manual checks)
-  - Regression tests (automated verification)
-  - Files to create/modify
-
-**Best for**: Implementation, code reviews, quality assurance
-
----
-
-### 10. 💻 [EXAMPLE-CODE.md](./EXAMPLE-CODE.md) - **Production Code Examples**
-**60K+ characters of production-ready TypeScript code**
-
-- Phase 1 Examples: package.json, tsconfig, database schema, upload service
-- Phase 2 Examples: PDF parser, graph structures, OpenAI integration
-- Phase 3 Examples: MCP service, evaluation service, metrics collector
-- Testing: Jest unit tests, integration tests
-- Docker: Dockerfile, docker-compose.yml, prometheus.yml
-
-**Best for**: Copy-paste starter code, implementation reference
-
----
-
-### 11. 🤖 [GROK-IMPLEMENTATION-PROMPT.md](./GROK-IMPLEMENTATION-PROMPT.md) - **AI Agent Guide**
-**Complete prompt for autonomous implementation with Cursor + Grok**
-
-- Mission context and objectives
-- Task execution pattern (Read → Implement → Validate → Test → Commit)
-- Phase-by-phase execution guide
-- Testing framework (Unit, Integration, E2E)
-- Error handling protocols
-- Commit message templates
-- Progress tracking guidelines
-
-**Best for**: Autonomous AI implementation, Cursor IDE integration
-
----
-
-### 12. 📦 [COMPLETE-DELIVERABLES.md](./COMPLETE-DELIVERABLES.md) - **Full Summary**
-**Comprehensive overview of all deliverables**
-
-- All 15 documentation files explained
-- Architecture highlights
-- Implementation plan summary
-- Key innovations
-- Success metrics
-- Job alignment
-- Next steps
-
-**Best for**: Final verification, submission checklist
-
----
-
-### 13. 🧭 [NAVIGATION-GUIDE.md](./NAVIGATION-GUIDE.md) - **How to Navigate**
-**Guide for reading documentation effectively**
-
-- Quick navigation by use case (reviewer, implementer, interviewer)
-- Document comparison matrix
-- Purpose & audience for each document
-- Information architecture map
-- Finding specific information
-- Recommended reading order
-- Completion criteria checklist
-
-**Best for**: First-time readers, choosing the right reading path
-
----
-
-### 14. 🗂️ [GIT-INSTRUCTIONS.md](./GIT-INSTRUCTIONS.md) - **Git Workflow**
-**Git push instructions and deployment guide**
-
----
-
-### 15. 🔧 [OCR-FREE-TIER-STRATEGY.md](./OCR-FREE-TIER-STRATEGY.md) - **Cost-Optimized OCR** ⚠️ **NEW**
-**Free-tier first OCR strategy**
-
-- **Problem**: Minimize API token usage for OCR
-- **Solution**: 4-tier cost-optimized strategy
-  - Tier 1: pdf-parse (65% coverage, $0)
-  - Tier 2: Tesseract.js local (25% coverage, $0)
-  - Tier 3: Reject poor quality (8% coverage, $0)
-  - Tier 4: GPT-4o/Gemini Vision (2% critical cases only, paid)
-- **Cost Savings**: 98% of documents processed free, 95-98% cost reduction
-- **Implementation**: CostOptimizedOCR.ts (350+ lines)
-- **Decision Logic**: Automatic, confidence-based
-- **Vision API**: Reserved for critical images/tables only
-
-**Best for**: Understanding cost-efficient OCR with minimal API usage
-
----
-
-### 16. 🤖 [MULTI-LLM-SUPPORT.md](./MULTI-LLM-SUPPORT.md) + `src/services/llm/` - **Multi-LLM Implementation** ✅ **NEW**
-**OpenAI + Google AI with automatic provider selection**
-
-- **Complete Implementation**: Full working code in `src/services/llm/`
-- **Problem**: Support both OpenAI and Google API keys
-- **Solution**: Provider abstraction layer with auto-detection
-- **Features**:
-  - ILLMProvider interface (unified abstraction)
-  - OpenAIProvider (GPT-4o, GPT-4, GPT-3.5)
-  - GoogleProvider (Gemini 1.5 Pro, Gemini 1.5 Flash)
-  - LLMProviderManager (auto-selection + fallback)
-  - Cost tracking per provider
-  - Vision support (GPT-4o Vision / Gemini 1.5 Pro Vision)
-  - Health checks for all providers
-- **Cost Optimization**:
-  - Gemini 1.5 Flash: 55x cheaper than GPT-4o
-  - Gemini 1.5 Pro: 3.3x cheaper than GPT-4o
-  - Gemini 1.5 Pro Vision: 2x cheaper than GPT-4o Vision
-- **Configuration**: `LLM_PROVIDER=auto` (auto-select), `openai`, or `google`
-- **Usage**:
-  ```typescript
-  import { llmProviderManager } from '@services/llm';
-  
-  // Auto-select available provider
-  const response = await llmProviderManager.generateText({
-    messages: [{ role: 'user', content: 'Summarize...' }],
-  });
-  ```
-
-**Best for**: Understanding multi-LLM architecture and cost optimization
-
----
-
-### 17. ⚙️ [.gitignore](./.gitignore) - **Git Ignore Config**
-**Standard exclusions for Node.js project**
-
----
-
-## 🚀 Quick Start
-
-### For Reviewers
-
-1. **Read** [`PROJECT-SUMMARY.md`](./PROJECT-SUMMARY.md) for executive overview (5 min)
-2. **Browse** [`QUICK-REFERENCE.md`](./QUICK-REFERENCE.md) for key concepts (3 min)
-3. **View** [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) for visual understanding (5 min)
-4. **Check** [`EVALUATION-PROOF.md`](./EVALUATION-PROOF.md) for automatic quality validation (5 min)
-5. ⚠️ **OCR** [`OCR-ENHANCEMENT.md`](./OCR-ENHANCEMENT.md) for scanned PDF support (5 min)
-6. **Deep Dive** [`C4-ARCHITECTURE.md`](./C4-ARCHITECTURE.md) for complete design (15 min)
-7. **Code Examples** [`EXAMPLE-CODE.md`](./EXAMPLE-CODE.md) for production code (10 min)
-
-**Total Review Time**: ~50 minutes for complete understanding
-
-### For Implementers
-
-1. **Plan**: Review [`IMPLEMENTATION-ROADMAP.md`](./IMPLEMENTATION-ROADMAP.md) for 95 tasks (5 min)
-2. **Tasks**: Follow [`TASK-SPECIFICATIONS.md`](./TASK-SPECIFICATIONS.md) step-by-step
-3. **Code**: Copy from [`EXAMPLE-CODE.md`](./EXAMPLE-CODE.md) as reference
-4. ⚠️ **OCR**: Add OCR support from [`OCR-ENHANCEMENT.md`](./OCR-ENHANCEMENT.md) (Phase 2.5)
-5. **Evaluation**: Integrate [`EVALUATION-PROOF.md`](./EVALUATION-PROOF.md)
-6. **Troubleshoot**: Check [`QUICK-REFERENCE.md`](./QUICK-REFERENCE.md)
-
-### For AI-Assisted Implementation (Cursor + Grok)
+### **For Cursor + Grok** (Autonomous Implementation)
 
 1. **Load Project**: Open in Cursor IDE
 2. **Enable Grok**: Turn on Agent Mode
-3. **Paste Prompt**: Copy entire [`GROK-IMPLEMENTATION-PROMPT.md`](./GROK-IMPLEMENTATION-PROMPT.md)
+3. **Paste Prompt**: Copy entire [`docs/implementation/GROK-IMPLEMENTATION-PROMPT.md`](./docs/implementation/GROK-IMPLEMENTATION-PROMPT.md)
 4. **Execute**: Let Grok implement all 95 tasks autonomously
 5. **Monitor**: Track progress via git commits
+
+---
+
+## 📖 Documentation by Category
+
+### 🏗️ **Architecture** (System Design)
+
+| Document | Lines | Purpose |
+|----------|-------|---------|
+| [`docs/architecture/ARCHITECTURE-DIAGRAMS.md`](./docs/architecture/ARCHITECTURE-DIAGRAMS.md) | 699 | 11 Mermaid diagrams covering all levels |
+| [`docs/architecture/C4-ARCHITECTURE.md`](./docs/architecture/C4-ARCHITECTURE.md) | 1,586 | Complete C4 model (4 levels) with TypeScript interfaces |
+| [`docs/architecture/EVALUATION-PROOF.md`](./docs/architecture/EVALUATION-PROOF.md) | 564 | Automatic quality validation with RAGAS |
+
+**Total**: 2,849 lines
+
+---
+
+### 💻 **Implementation** (Build Guides & Code)
+
+| Document | Lines | Purpose |
+|----------|-------|---------|
+| [`docs/implementation/IMPLEMENTATION-GUIDE.md`](./docs/implementation/IMPLEMENTATION-GUIDE.md) | 1,419 | Step-by-step build guide (Phase 1 & 2) |
+| [`docs/implementation/IMPLEMENTATION-ROADMAP.md`](./docs/implementation/IMPLEMENTATION-ROADMAP.md) | 454 | 95-task roadmap across 3 phases |
+| [`docs/implementation/TASK-SPECIFICATIONS.md`](./docs/implementation/TASK-SPECIFICATIONS.md) | 1,200 | Detailed specs for all 95 tasks |
+| [`docs/implementation/EXAMPLE-CODE.md`](./docs/implementation/EXAMPLE-CODE.md) | 2,100 | 60KB+ production-ready TypeScript |
+| [`docs/implementation/GROK-IMPLEMENTATION-PROMPT.md`](./docs/implementation/GROK-IMPLEMENTATION-PROMPT.md) | 500 | Autonomous AI implementation prompt |
+
+**Total**: 5,673 lines
+
+---
+
+### 📚 **Guides** (Quick References & Navigation)
+
+| Document | Lines | Purpose |
+|----------|-------|---------|
+| [`docs/guides/QUICK-REFERENCE.md`](./docs/guides/QUICK-REFERENCE.md) | 454 | One-page cheat sheet for key concepts |
+| [`docs/guides/NAVIGATION-GUIDE.md`](./docs/guides/NAVIGATION-GUIDE.md) | 400 | How to navigate documentation |
+| [`docs/guides/GIT-INSTRUCTIONS.md`](./docs/guides/GIT-INSTRUCTIONS.md) | 150 | Git workflow and deployment |
+| [`docs/guides/COMPLETE-DELIVERABLES.md`](./docs/guides/COMPLETE-DELIVERABLES.md) | 400 | Full project summary |
+
+**Total**: 1,404 lines
+
+---
+
+### 🤖 **LLM** (Multi-Provider System) ⭐ **NEW**
+
+| Document | Lines | Purpose |
+|----------|-------|---------|
+| [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md) | 1,109 | Complete architecture specification |
+| [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) | 513 | 5-minute quick start guide |
+| [`docs/llm/MULTI-LLM-IMPLEMENTATION-SUMMARY.md`](./docs/llm/MULTI-LLM-IMPLEMENTATION-SUMMARY.md) | 477 | Implementation verification |
+| [`src/services/llm/README.md`](./src/services/llm/README.md) | 350 | Developer documentation |
+
+**Plus Working Code**:
+- `src/services/llm/ILLMProvider.ts` (81 lines)
+- `src/services/llm/OpenAIProvider.ts` (184 lines)
+- `src/services/llm/GoogleProvider.ts` (247 lines)
+- `src/services/llm/LLMProviderManager.ts` (238 lines)
+- `src/services/llm/index.ts` (21 lines)
+- `src/utils/logger.ts` (22 lines)
+- `src/utils/errors.ts` (18 lines)
+
+**Total**: 2,449 lines docs + 811 lines code = **3,260 lines**
+
+---
+
+### 📋 **Specifications** (Feature Specs & Requirements)
+
+| Document | Lines | Purpose |
+|----------|-------|---------|
+| [`docs/specifications/PROJECT-SUMMARY.md`](./docs/specifications/PROJECT-SUMMARY.md) | 564 | Executive overview and job alignment |
+| [`docs/specifications/OCR-ENHANCEMENT.md`](./docs/specifications/OCR-ENHANCEMENT.md) | 800 | OCR for scanned PDFs (hybrid pipeline) |
+| [`docs/specifications/OCR-FREE-TIER-STRATEGY.md`](./docs/specifications/OCR-FREE-TIER-STRATEGY.md) | 750 | Cost-optimized OCR (98% free) |
+
+**Total**: 2,114 lines
 
 ---
 
@@ -375,11 +228,69 @@ PDF → Knowledge Graph (Nodes + Edges) → MCP Retrieval (AI requests nodes) �
 
 ---
 
+## 🤖 Multi-LLM Architecture
+
+### Provider Support
+
+**Implemented Providers**:
+- ✅ **OpenAI**: GPT-4o, GPT-4 Turbo, GPT-4, GPT-3.5 Turbo
+- ✅ **Google AI**: Gemini 1.5 Pro, Gemini 1.5 Flash
+
+**Key Features**:
+- 🔄 **Auto-Detection**: Automatically selects provider based on API keys
+- 🔁 **Fallback Logic**: Falls back to alternative provider if primary fails
+- 💰 **Cost Tracking**: Per-provider cost calculation
+- 👁️ **Vision Support**: GPT-4o Vision + Gemini 1.5 Pro Vision
+- 🏥 **Health Checks**: Provider availability monitoring
+- 🔧 **Easy Extension**: Add Claude, Llama, or custom models
+
+### Cost Optimization
+
+| Provider | Model | Cost (1K tokens) | Savings vs GPT-4o |
+|----------|-------|------------------|-------------------|
+| OpenAI | GPT-4o | $0.0125 | - |
+| Google | Gemini 1.5 Pro | $0.0037 | **70%** 💰 |
+| Google | Gemini 1.5 Flash | $0.00023 | **98%** 🏆 |
+
+**Real-World Savings** (1,000 documents):
+- Before (GPT-4o only): $18.75/month
+- After (Gemini 1.5 Flash): $0.34/month
+- **Savings: $18.41/month (98% reduction!)** 🎉
+
+**Documentation**:
+- Quick Start: [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md)
+- Architecture: [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md)
+- Code: [`src/services/llm/`](./src/services/llm/)
+
+---
+
+## 🔍 OCR Support
+
+### Hybrid OCR Pipeline
+
+**4-Tier Cost-Optimized Strategy**:
+1. **pdf-parse** (65% coverage, $0) - Text-based PDFs
+2. **Tesseract.js** (25% coverage, $0) - Good quality scans (local, free)
+3. **Reject + Feedback** (8% coverage, $0) - Poor quality scans
+4. **Vision API** (2% coverage, paid) - Critical cases only (images/tables)
+
+**Result**: 98% of documents processed **FREE**, 95-98% cost reduction
+
+**Vision API Support**:
+- OpenAI GPT-4o Vision ($0.01-0.02 per image)
+- Google Gemini 1.5 Pro Vision ($0.005-0.01 per image) - **2x cheaper**
+
+**Documentation**:
+- Enhancement: [`docs/specifications/OCR-ENHANCEMENT.md`](./docs/specifications/OCR-ENHANCEMENT.md)
+- Strategy: [`docs/specifications/OCR-FREE-TIER-STRATEGY.md`](./docs/specifications/OCR-FREE-TIER-STRATEGY.md)
+
+---
+
 ## 🏛️ Architecture Highlights
 
 ### C4 Level 1: System Context
 ```
-User → [PDF Summary AI] → OpenAI/GCP → PostgreSQL + Redis + S3 → Prometheus + Grafana
+User → [PDF Summary AI] → OpenAI/Google → PostgreSQL + Redis + S3 → Prometheus + Grafana
 ```
 
 ### C4 Level 2: Containers
@@ -406,67 +317,7 @@ React SPA → API Gateway → Processing Service (5 stages) → Evaluation Servi
 - Processing models (PDFParseResult, SummaryResponse)
 - Evaluation models (EvaluationScores, ProcessingMetrics)
 
----
-
-## 📊 Documentation Statistics
-
-| Metric | Value |
-|--------|-------|
-| **Total Files** | 5 comprehensive documents |
-| **Total Lines** | 4,722 lines |
-| **Total Words** | 13,845 words |
-| **Mermaid Diagrams** | 11 (all abstraction levels) |
-| **TypeScript Interfaces** | 25+ data models |
-| **Code Samples** | ~550 lines (production-ready) |
-| **Architecture Levels** | 4 (C4: Context, Container, Component, Code) |
-
-### File Breakdown
-
-| File | Lines | Words | Purpose |
-|------|-------|-------|---------|
-| **C4-ARCHITECTURE.md** | 1,586 | 4,027 | Complete architecture (4 levels) |
-| **IMPLEMENTATION-GUIDE.md** | 1,419 | 3,822 | Step-by-step build guide |
-| **ARCHITECTURE-DIAGRAMS.md** | 699 | 1,946 | 11 Mermaid diagrams |
-| **PROJECT-SUMMARY.md** | 564 | 2,531 | Executive overview |
-| **QUICK-REFERENCE.md** | 454 | 1,519 | One-page cheat sheet |
-
----
-
-## 🎓 Key Concepts
-
-### 1. Knowledge Graph
-Documents represented as:
-- **Nodes**: Sections, paragraphs, tables, images (with page numbers)
-- **Edges**: Hierarchical (parent-child), Reference ("see Table 1"), Semantic (similarity), Sequential (flow)
-
-### 2. MCP (Model Context Protocol)
-LLM can call tools to retrieve context:
-```typescript
-Tools: [get_related_node(nodeId, depth)]
-
-// LLM calls:
-get_related_node("table_1", 1)
-
-// System returns:
-{ node: TableNode, neighbors: [TextNode, TextNode] }
-```
-
-### 3. Grounding
-Every summary statement includes:
-```
-"Revenue grew 25%." [Node: table_1, Page 2, Confidence: 0.95]
-                     ↑
-              Traceable to source
-```
-
-### 4. Automatic Quality Proof (NEW!)
-- **Automatic Evaluation**: Runs after every summary generation
-- **RAGAS Metrics**: Faithfulness (0.92), Answer Relevancy (0.88), Context Recall (0.85), Precision (0.90)
-- **Custom Metrics**: Grounding Score (0.95), Coverage Score (0.78), Graph Utilization (0.42)
-- **Overall Score**: Weighted average (0.87) with grade (B - Good)
-- **Auto-Decision**: Approve (≥0.7) or flag for review (<0.7)
-- **Quality Badge**: Users see verification status with summary
-- **Real-time Monitoring**: Prometheus + Grafana dashboards
+**Full Details**: [`docs/architecture/C4-ARCHITECTURE.md`](./docs/architecture/C4-ARCHITECTURE.md)
 
 ---
 
@@ -519,55 +370,6 @@ Every summary statement includes:
 
 ---
 
-## 📦 Deliverables
-
-### Documentation ✅
-- [x] Complete C4 Architecture (4 levels)
-- [x] Visual Mermaid Diagrams (11 diagrams)
-- [x] Implementation Guide (step-by-step)
-- [x] Quick Reference (cheat sheet)
-- [x] Project Summary (executive overview)
-
-### Architecture ✅
-- [x] System Context design
-- [x] Container architecture
-- [x] Component design
-- [x] TypeScript interfaces (25+)
-- [x] Graph data model
-- [x] Evaluation architecture
-- [x] Deployment architecture
-
-### Code Samples ✅
-- [x] PDF Parser Service
-- [x] Graph Builder Service
-- [x] OpenAI Integration
-- [x] MCP Context Retriever
-- [x] Evaluation Engine
-- [x] Upload Controller
-- [x] React Frontend Component
-
-### Infrastructure ✅
-- [x] Docker Compose configuration
-- [x] Dockerfile examples
-- [x] Environment configuration
-- [x] CI/CD pipeline design
-
----
-
-## 🎬 Demo Script (For Loom Recording)
-
-### Structure (5-7 minutes)
-
-1. **Intro** (30s): Name + project + key innovation
-2. **Architecture** (1m): Show C4 diagrams, explain graph approach
-3. **Live Demo** (2m): Upload PDF, show summary with metadata
-4. **Code Walk** (2m): Parser → Graph → OpenAI → API
-5. **Advanced** (1m): Show Phase 2 designs (tables, MCP, RAGAS)
-6. **Docker** (30s): `docker-compose up`, reproducible setup
-7. **Wrap-up** (30s): Job alignment, thank you
-
----
-
 ## 🌟 Key Differentiators
 
 1. **Graph-First**: Documents as knowledge graphs, not strings
@@ -582,47 +384,73 @@ Every summary statement includes:
 
 ---
 
-## 📈 Next Steps
+## 📊 Documentation Statistics
 
-### For Reviewer
-1. Review [`PROJECT-SUMMARY.md`](./PROJECT-SUMMARY.md) (5 min)
-2. Check [`QUICK-REFERENCE.md`](./QUICK-REFERENCE.md) (3 min)
-3. View [`ARCHITECTURE-DIAGRAMS.md`](./ARCHITECTURE-DIAGRAMS.md) (5 min)
-4. Deep dive [`C4-ARCHITECTURE.md`](./C4-ARCHITECTURE.md) (15 min)
-
-### For Implementation
-1. Follow [`IMPLEMENTATION-GUIDE.md`](./IMPLEMENTATION-GUIDE.md) Phase 1 (2-3h)
-2. Build core features
-3. Record Loom demo
-4. Submit GitHub repo + Loom link
-
-### For Production
-1. Implement Phase 2 features (tables, MCP, RAGAS)
-2. Add authentication (JWT, OAuth)
-3. Deploy to cloud (AWS/GCP)
-4. Configure monitoring (Prometheus + Grafana)
-5. Set up CI/CD (GitHub Actions)
+| Metric | Value |
+|--------|-------|
+| **Total Documentation Files** | 19 files (18 MD + 1 README in src/) |
+| **Total Lines** | 9,600+ lines |
+| **Total Words** | 85,000+ words |
+| **Working Code** | 811 lines TypeScript |
+| **Mermaid Diagrams** | 11 (all abstraction levels) |
+| **TypeScript Interfaces** | 25+ data models |
+| **Architecture Levels** | 4 (C4: Context, Container, Component, Code) |
+| **Supported LLM Providers** | 2 (OpenAI + Google) |
+| **Supported Models** | 8 (GPT-4o, Gemini 1.5 Pro, etc.) |
 
 ---
 
-## 📞 Contact
+## 📦 Deliverables
 
-**Project**: PDF Summary AI - Document-Aware Architecture  
-**Assignment**: COXIT Take-Home (Senior Full-Stack Developer)  
-**Date**: 2025-11-26  
+### Documentation ✅
+- [x] Complete C4 Architecture (4 levels)
+- [x] Visual Mermaid Diagrams (11 diagrams)
+- [x] Implementation Guide (step-by-step)
+- [x] Quick Reference (cheat sheet)
+- [x] Project Summary (executive overview)
+- [x] Multi-LLM Documentation (3 files + code)
+- [x] OCR Enhancement (2 specifications)
+- [x] AI Agent Guide (AGENT.md)
 
-**Repository Structure**:
-```
-pdf-summary-ai/
-├── README.md                      # This file - Main index
-├── PROJECT-SUMMARY.md             # Executive overview
-├── QUICK-REFERENCE.md             # One-page cheat sheet
-├── ARCHITECTURE-DIAGRAMS.md       # 11 Mermaid diagrams
-├── C4-ARCHITECTURE.md             # Complete C4 (4 levels)
-└── IMPLEMENTATION-GUIDE.md        # Step-by-step build guide
-```
+### Architecture ✅
+- [x] System Context design
+- [x] Container architecture
+- [x] Component design
+- [x] TypeScript interfaces (25+)
+- [x] Graph data model
+- [x] Evaluation architecture
+- [x] Deployment architecture
+- [x] Multi-LLM provider system
 
-**Documentation Status**: ✅ Complete (all 5 files, 4,722 lines)
+### Code Samples ✅
+- [x] PDF Parser Service
+- [x] Graph Builder Service
+- [x] OpenAI Provider (184 lines)
+- [x] Google Provider (247 lines)
+- [x] LLM Provider Manager (238 lines)
+- [x] MCP Context Retriever
+- [x] Evaluation Engine
+- [x] Upload Controller
+- [x] React Frontend Component
+
+### Infrastructure ✅
+- [x] Docker Compose configuration
+- [x] Dockerfile examples
+- [x] Environment configuration
+- [x] CI/CD pipeline design
+
+---
+
+## 📞 Contact & Links
+
+**Repository**: https://github.com/abezr/pdf-summarize
+
+**Key Documents**:
+- **AI Agents**: [`AGENT.md`](./AGENT.md)
+- **Multi-LLM Quick Start**: [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md)
+- **Project Summary**: [`docs/specifications/PROJECT-SUMMARY.md`](./docs/specifications/PROJECT-SUMMARY.md)
+- **Quick Reference**: [`docs/guides/QUICK-REFERENCE.md`](./docs/guides/QUICK-REFERENCE.md)
+- **Complete Architecture**: [`docs/architecture/C4-ARCHITECTURE.md`](./docs/architecture/C4-ARCHITECTURE.md)
 
 ---
 
@@ -636,8 +464,10 @@ This architecture demonstrates **senior-level thinking**:
 4. ✅ Production-ready design
 5. ✅ Extensible architecture
 6. ✅ Job requirements alignment
+7. ✅ Multi-LLM cost optimization
+8. ✅ Comprehensive documentation
 
-**The core insight**: By treating documents as knowledge graphs, we enable AI to reason about structure and references, resulting in more precise, grounded, and verifiable summaries.
+**The core insight**: By treating documents as knowledge graphs and supporting multiple LLM providers with automatic cost optimization, we enable AI to reason about structure and references while minimizing costs, resulting in more precise, grounded, and cost-effective summaries.
 
 ---
 

@@ -32,7 +32,8 @@ docs/
 ├── llm/                  # LLM provider implementation
 │   ├── MULTI-LLM-SUPPORT.md
 │   ├── MULTI-LLM-QUICKSTART.md
-│   └── MULTI-LLM-IMPLEMENTATION-SUMMARY.md
+│   ├── MULTI-LLM-IMPLEMENTATION-SUMMARY.md
+│   └── QUOTA-MANAGEMENT.md    # NEW: Dynamic quota management
 └── specifications/       # Feature specifications
     ├── PROJECT-SUMMARY.md
     ├── OCR-ENHANCEMENT.md
@@ -92,7 +93,15 @@ Read these documents in order:
    - Requirement verification
    - **When to use:** Verifying implementation completeness
 
-4. **[`src/services/llm/README.md`](./src/services/llm/README.md)** 💻 **CODE REFERENCE**
+4. **[`docs/llm/QUOTA-MANAGEMENT.md`](./docs/llm/QUOTA-MANAGEMENT.md)** 🎯 **NEW: QUOTA MANAGEMENT**
+   - Dynamic model selection based on daily quotas
+   - Intelligent task-purpose detection
+   - Automatic fallback when quota exhausted
+   - Google Gemini free tier limits (RPM/TPM/RPD)
+   - Cost optimization strategies (97%+ savings)
+   - **When to use:** Implementing quota-aware LLM calls
+
+5. **[`src/services/llm/README.md`](./src/services/llm/README.md)** 💻 **CODE REFERENCE**
    - Developer documentation
    - Usage patterns
    - Adding new providers
@@ -188,7 +197,83 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 4: Understanding the Architecture**
+### **Task 4: Managing Google Gemini Quotas**
+
+**Priority: HIGH** 🔴 **NEW FEATURE**
+
+**Dynamic Quota Management System:**
+
+This system automatically distributes token usage across Google Gemini models based on daily quotas, selecting the optimal model for each task and automatically falling back when limits are reached.
+
+**Required Reading:**
+
+1. **[`docs/llm/QUOTA-MANAGEMENT.md`](./docs/llm/QUOTA-MANAGEMENT.md)** 📊 **COMPREHENSIVE GUIDE**
+   - How quota tracking works
+   - Task purpose detection (6 types)
+   - Model selection algorithm
+   - Google Free Tier limits (RPM/TPM/RPD)
+   - Daily reset logic (midnight Pacific Time)
+   - Cost savings examples (97%+ reduction)
+   - Configuration and monitoring
+   - **When to use:** Implementing any LLM-dependent feature
+
+**Key Concepts:**
+
+```typescript
+// Automatic model selection based on task purpose
+import { llmProviderManager } from './services/llm';
+
+// System automatically selects best model with available quota
+const response = await llmProviderManager.generateText({
+  messages: [
+    { role: 'user', content: 'Summarize this document...' }
+  ]
+});
+
+// Response includes which model was used
+console.log(`Used: ${response.model}`); // e.g., "gemini-1.5-flash"
+```
+
+**Task Purpose Types:**
+- `bulk-processing` → flash-8b (4M TPM, cheapest)
+- `quick-summary` → 2.0-flash-exp (4M TPM, free)
+- `standard-analysis` → flash (1M TPM, fast)
+- `detailed-analysis` → pro (32K TPM, best quality)
+- `vision-analysis` → flash/pro (OCR/images)
+- `critical-task` → pro (must succeed)
+
+**Quota Status Monitoring:**
+
+```typescript
+import { quotaManager } from './services/llm';
+
+const status = quotaManager.getQuotaStatus();
+// Shows: total budget, usage per model, remaining quota, next reset time
+```
+
+**Configuration:**
+
+```bash
+# .env
+GOOGLE_QUOTA_MANAGEMENT=true      # Enable (default)
+GOOGLE_DAILY_QUOTA=1000000        # 1M tokens/day (default)
+```
+
+**Free Tier Limits to Remember:**
+- **gemini-1.5-pro**: 50 RPD (very limited!)
+- **gemini-1.5-flash**: 1,500 RPD
+- **gemini-1.5-flash-8b**: 1,500 RPD, 4M TPM
+
+**When Implementing:**
+- Don't hardcode models in `.env`
+- Let quota manager select models dynamically
+- Handle 429 errors (quota exhausted)
+- Use task purpose keywords in prompts
+- Monitor quota status in logs
+
+---
+
+### **Task 5: Understanding the Architecture**
 
 **Priority: HIGH** 🔴
 
@@ -216,7 +301,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 5: Implementing New Features**
+### **Task 6: Implementing New Features**
 
 **Priority: MEDIUM** 🟡
 
@@ -246,7 +331,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 6: Understanding OCR Integration**
+### **Task 7: Understanding OCR Integration**
 
 **Priority: MEDIUM** 🟡
 
@@ -270,7 +355,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 7: Debugging and Troubleshooting**
+### **Task 8: Debugging and Troubleshooting**
 
 **Priority: MEDIUM** 🟡
 

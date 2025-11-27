@@ -12,6 +12,7 @@ import {
 } from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
+import { tokenManager } from './token-manager';
 
 export class OpenAIProvider implements ILLMProvider {
   public readonly name = 'openai';
@@ -68,14 +69,23 @@ export class OpenAIProvider implements ILLMProvider {
         total: completion.usage?.total_tokens || 0,
       };
 
-      // Calculate cost (OpenAI pricing)
-      const cost = this.calculateCost(model, tokensUsed);
+      // Calculate cost using token manager
+      const costBreakdown = tokenManager.calculateCost(model, tokensUsed);
       const processingTime = Date.now() - startTime;
+
+      // Record usage for analytics
+      tokenManager.recordUsage(
+        model,
+        'openai',
+        'text-generation',
+        tokensUsed,
+        { requestModel: request.model, maxTokens: request.maxTokens }
+      );
 
       logger.info('OpenAI text generation completed', {
         model,
         tokensUsed: tokensUsed.total,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       });
 
@@ -84,7 +94,7 @@ export class OpenAIProvider implements ILLMProvider {
         model: completion.model,
         provider: 'openai',
         tokensUsed,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       };
     } catch (error: any) {
@@ -143,12 +153,21 @@ export class OpenAIProvider implements ILLMProvider {
         total: completion.usage?.total_tokens || 0,
       };
 
-      const cost = this.calculateCost('gpt-4o', tokensUsed);
+      const costBreakdown = tokenManager.calculateCost('gpt-4o', tokensUsed);
       const processingTime = Date.now() - startTime;
+
+      // Record usage for analytics
+      tokenManager.recordUsage(
+        'gpt-4o',
+        'openai',
+        'vision-analysis',
+        tokensUsed,
+        { imageSize: request.imageBase64.length }
+      );
 
       logger.info('OpenAI vision analysis completed', {
         tokensUsed: tokensUsed.total,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       });
 
@@ -157,7 +176,7 @@ export class OpenAIProvider implements ILLMProvider {
         model: 'gpt-4o',
         provider: 'openai',
         tokensUsed,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       };
     } catch (error: any) {
@@ -168,21 +187,6 @@ export class OpenAIProvider implements ILLMProvider {
     }
   }
 
-  private calculateCost(model: string, tokensUsed: any): number {
-    // OpenAI pricing (as of 2024)
-    const pricing: Record<string, { input: number; output: number }> = {
-      'gpt-4o': { input: 0.005, output: 0.015 }, // per 1K tokens
-      'gpt-4-turbo': { input: 0.01, output: 0.03 },
-      'gpt-4': { input: 0.03, output: 0.06 },
-      'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-    };
-
-    const modelPricing = pricing[model] || pricing['gpt-4o'];
-    const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
-    const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
-
-    return inputCost + outputCost;
-  }
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;

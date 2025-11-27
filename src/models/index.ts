@@ -30,3 +30,6 @@ export interface UpdateDocumentInput {
   summary?: string;
   metadata?: Record<string, any>;
 }
+
+// Graph model interfaces
+export * from './graph.model';

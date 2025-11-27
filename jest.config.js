@@ -21,6 +21,11 @@ module.exports = {
     '^.+\\.ts$': 'ts-jest',
   },
 
+  // Transform ES modules that Jest can't handle
+  transformIgnorePatterns: [
+    'node_modules/(?!uuid/.*)'
+  ],
+
   // Module file extensions
   moduleFileExtensions: ['ts', 'js', 'json'],
 

@@ -29,6 +29,33 @@ export {
   type ModelQuota,
 } from './QuotaManager';
 
+// Export prompt templates
+export {
+  promptTemplateService,
+  PromptTemplateService,
+  type SummaryType,
+  type SummaryRequest,
+  type PromptTemplate,
+} from './prompt-templates';
+
+// Export summarization service
+export {
+  summarizationService,
+  SummarizationService,
+  type SummarizationOptions,
+  type SummarizationResult,
+} from './summarization.service';
+
+// Export token manager
+export {
+  tokenManager,
+  TokenManager,
+  type TokenUsage,
+  type CostBreakdown,
+  type ModelPricing,
+  type UsageRecord,
+} from './token-manager';
+
 // Import for convenience exports
 import { llmProviderManager } from './LLMProviderManager';
 import { quotaManager } from './QuotaManager';

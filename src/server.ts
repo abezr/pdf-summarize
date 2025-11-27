@@ -145,7 +145,13 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// API routes will be mounted here
+// Import API routes
+import documentRoutes from './api/routes/documents';
+
+// Mount API routes
+app.use('/api/documents', documentRoutes);
+
+// API info endpoint
 app.get('/api', (req, res) => {
   res.json({
     name: 'PDF Summary AI',
@@ -153,8 +159,14 @@ app.get('/api', (req, res) => {
     status: 'running',
     endpoints: {
       health: 'GET /api/health',
-      upload: 'POST /api/upload/pdf',
-      // Add more endpoints as they are implemented
+      documents: {
+        upload: 'POST /api/documents/upload',
+        list: 'GET /api/documents',
+        stats: 'GET /api/documents/stats',
+        get: 'GET /api/documents/:id',
+        summarize: 'POST /api/documents/:id/summarize',
+        delete: 'DELETE /api/documents/:id'
+      }
     }
   });
 });

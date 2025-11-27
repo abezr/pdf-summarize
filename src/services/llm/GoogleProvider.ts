@@ -7,7 +7,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
-import { quotaManager, TaskPurpose } from './QuotaManager';
+import { quotaManager, QuotaManager, TaskPurpose } from './QuotaManager';
 
 export class GoogleProvider implements ILLMProvider {
   public readonly name = 'google';
@@ -58,7 +58,7 @@ export class GoogleProvider implements ILLMProvider {
       // Auto-select model based on task purpose and available quota
       const purpose = this.inferTaskPurpose(request);
       const inputText = JSON.stringify(request.messages);
-      const estimatedTokens = quotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
+      const estimatedTokens = QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
       
       try {
         modelName = quotaManager.selectModel(purpose, estimatedTokens);
@@ -78,7 +78,7 @@ export class GoogleProvider implements ILLMProvider {
       // Check quota even for explicit model requests
       if (this.enableQuotaManagement) {
         const inputText = JSON.stringify(request.messages);
-        const estimatedTokens = quotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
+        const estimatedTokens = QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
         
         if (!quotaManager.hasAvailableQuota(modelName, estimatedTokens)) {
           logger.warn(`Requested model ${modelName} has no quota, attempting fallback`);

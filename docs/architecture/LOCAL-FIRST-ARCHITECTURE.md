@@ -22,6 +22,23 @@
 
 ### High-Level Overview
 
+### Mermaid - Local-First Overview
+
+```mermaid
+flowchart LR
+  user([User Browser\nlocalhost]) --> api[Express API\nlocalhost:3000]
+  api --> pipeline[Processing Pipeline\npdf-parse | Tesseract | graph | embeddings]
+  api --> cache[(Cache\nnode-cache)]
+  api --> db[(SQLite\n./data/database.sqlite)]
+  api --> fs[(Local FS\n./data/uploads\n./data/graphs\n./data/embeddings\n./data/cache)]
+  pipeline --> fs
+  pipeline --> db
+  pipeline --> cache
+  pipeline -->|LLM calls| llm[(LLM APIs\nOpenAI / Gemini)]
+  fs -. cached inputs/outputs .-> pipeline
+  db -. metadata/summaries .-> api
+```
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    LOCAL MACHINE ONLY                        │

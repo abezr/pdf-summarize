@@ -4,12 +4,12 @@
 
 ## Overview
 
-The Quota Management system automatically distributes your Google Gemini API token budget across multiple models, selecting the most appropriate model for each task while respecting daily quota limits.
+The Quota Management system automatically distributes your Google Gemini API calls across multiple models, selecting the most appropriate model for each task while respecting per-model daily limits.
 
 ### Key Features
 
 ✅ **Automatic Model Selection** - Chooses optimal model based on task purpose  
-✅ **Daily Quota Tracking** - Monitors token usage per model and overall budget  
+✅ **Daily Quota Tracking** - Monitors per-model RPD/RPM/TPM usage  
 ✅ **Intelligent Fallback** - Switches to alternative models when quota exhausted  
 ✅ **Cost Optimization** - Prefers cheaper models for suitable tasks  
 ✅ **Zero Configuration** - Works out of the box with sensible defaults
@@ -24,7 +24,7 @@ The Quota Management system automatically distributes your Google Gemini API tok
 # .env
 GOOGLE_API_KEY=your-api-key-here
 GOOGLE_QUOTA_MANAGEMENT=true          # Enable (default)
-GOOGLE_DAILY_QUOTA=1000000            # 1M tokens/day (default)
+# Per-model limits follow Google's free-tier RPD/RPM/TPM rules by default
 ```
 
 ### 2. Use Automatically
@@ -75,10 +75,10 @@ For each task:
 
 After each successful request:
 
-- Records actual tokens used
-- Updates model-specific and total daily usage
-- Alerts when approaching limits (80%, 90%)
-- Prevents new requests if budget exhausted
+- Records actual tokens used (for reporting only)
+- Tracks per-model daily request counts and token usage
+- Alerts when approaching per-model daily request caps
+- Blocks requests to models that hit their daily cap and falls back to others
 
 ### 4. Daily Reset
 
@@ -120,27 +120,18 @@ Quotas automatically reset at **midnight Pacific Time** (per Google's rules).
 # Enable/disable quota management
 GOOGLE_QUOTA_MANAGEMENT=true          # Default: true
 
-# Daily token budget (total across all models)
-GOOGLE_DAILY_QUOTA=1000000            # Default: 1M tokens/day
-
-# Adjust based on your tier:
-# - Free Tier: 1,000,000 (recommended)
-# - Light usage: 500,000
-# - Heavy usage: 2,000,000+
+# No global daily token budget is needed.
+# Per-model limits follow Google's published RPD/RPM/TPM values.
+# Override behavior in code if you need custom caps (see QuotaManager).
 ```
 
-### Budget Guidelines
+### Request Allocation Guidelines (Free Tier)
 
-**Free Tier Strategy** (1M tokens/day):
-
-- **gemini-1.5-flash-8b**: 600K tokens (bulk)
-- **gemini-1.5-flash**: 300K tokens (standard)
-- **gemini-1.5-pro**: 100K tokens (critical)
-
-This allows:
-- 150+ standard document summaries/day
-- 300+ quick summaries/day
-- 10-15 critical analyses/day
+- **gemini-1.5-flash-8b**: prioritize bulk/cheap work (up to 1,500 requests/day)
+- **gemini-1.5-flash**: standard + quick summaries (up to 1,500 requests/day)
+- **gemini-1.5-pro**: reserve for critical/detailed tasks (50 requests/day)
+- **gemini-2.0-flash-exp**: experimental/fast (1,500 requests/day)
+- System automatically falls back when a model hits its daily RPD cap.
 
 ---
 
@@ -274,13 +265,10 @@ The system logs quota events:
 [INFO] Model auto-selected by quota manager { purpose: 'quick-summary', model: 'gemini-1.5-flash' }
 
 # Usage recording
-[INFO] Token usage recorded { model: 'gemini-1.5-flash', tokensUsed: 1234, totalToday: 45678 }
+[INFO] Token usage recorded { model: 'gemini-1.5-flash', tokensUsed: 1234, requestsToday: 12, tokensToday: 45678 }
 
-# Approaching limits
-[WARN] ⚠️  Approaching daily token budget (80%) { used: 800000, budget: 1000000 }
-
-# Critical threshold
-[ERROR] 🚨 Critical: Daily token budget nearly exhausted (90%) { used: 900000, budget: 1000000 }
+# Per-model cap reached
+[WARN] ⚠️  Model gemini-1.5-pro exceeded daily request limit { requests: 50, limit: 50 }
 
 # Quota exhausted
 [ERROR] All Gemini models have exceeded their daily quota. Please try again tomorrow.
@@ -306,16 +294,11 @@ try {
 
 ## Best Practices
 
-### 1. Set Realistic Daily Budget
+### 1. Monitor Per-Model Daily Caps
 
-```bash
-# Start conservative, increase as needed
-GOOGLE_DAILY_QUOTA=500000    # 500K tokens/day
-
-# Monitor usage for 1-2 weeks
-# Adjust based on actual needs
-GOOGLE_DAILY_QUOTA=1500000   # 1.5M tokens/day
-```
+- Watch `requestsToday` vs `rpd` in `quotaManager.getQuotaStatus()`.
+- Expect `gemini-1.5-pro` (50 RPD) to exhaust first; reserve it for critical work.
+- Let flash/flash-8b handle bulk to stay under their 1,500 RPD caps.
 
 ### 2. Use Task Purpose Keywords
 
@@ -375,8 +358,8 @@ router.get('/quota-status', async (req, res) => {
 **Cause**: Flash and Pro models exhausted, only flash-8b has quota remaining.
 
 **Solution**:
-1. Increase `GOOGLE_DAILY_QUOTA`
-2. Optimize token usage (reduce input size)
+1. Reserve `gemini-1.5-pro` for critical tasks only (50 RPD cap)
+2. Optimize token usage (reduce input size) so flash models stay within limits
 3. Wait for daily reset (midnight PT)
 
 ### Issue: Pro Model Never Selected
@@ -479,7 +462,6 @@ const response = await llmProviderManager.generateText({
 ```bash
 # .env
 GOOGLE_QUOTA_MANAGEMENT=true
-GOOGLE_DAILY_QUOTA=1000000
 # Remove GOOGLE_MODEL - not needed!
 ```
 

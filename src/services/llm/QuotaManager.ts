@@ -109,19 +109,14 @@ const MODEL_RECOMMENDATIONS: Record<TaskPurpose, string[]> = {
  */
 export class QuotaManager {
   private quotas: Map<string, ModelQuota>;
-  private dailyBudget: number; // Total tokens allowed per day
   private currentDayKey: string;
 
-  constructor(dailyBudget?: number) {
+  constructor() {
     this.quotas = new Map();
-    // Default: 1M tokens/day (reasonable for free tier mixed usage)
-    this.dailyBudget =
-      dailyBudget || parseInt(process.env.GOOGLE_DAILY_QUOTA || '1000000', 10);
     this.currentDayKey = this.getDayKey();
 
     this.initializeQuotas();
     logger.info('QuotaManager initialized', {
-      dailyBudget: this.dailyBudget,
       models: Array.from(this.quotas.keys()),
     });
   }
@@ -190,7 +185,7 @@ export class QuotaManager {
    */
   public hasAvailableQuota(
     model: string,
-    estimatedTokens: number = 1000
+    _estimatedTokens: number = 1000
   ): boolean {
     this.checkAndResetIfNeeded();
 
@@ -205,17 +200,6 @@ export class QuotaManager {
       logger.warn(`Model ${model} exceeded daily request limit`, {
         requests: quota.usage.requestsToday,
         limit: quota.limits.rpd,
-      });
-      return false;
-    }
-
-    // Check if adding these tokens would exceed daily budget
-    const totalUsageToday = this.getTotalTokensUsedToday();
-    if (totalUsageToday + estimatedTokens > this.dailyBudget) {
-      logger.warn(`Daily token budget would be exceeded`, {
-        currentUsage: totalUsageToday,
-        estimated: estimatedTokens,
-        budget: this.dailyBudget,
       });
       return false;
     }
@@ -264,13 +248,14 @@ export class QuotaManager {
       'All Gemini models have exceeded their daily quota. Please try again tomorrow.',
       429,
       {
-        totalUsage: this.getTotalTokensUsedToday(),
-        dailyBudget: this.dailyBudget,
         resetTime: this.getNextResetTime(),
       }
     );
   }
 
+  /**
+   * Record token usage for a model
+   */
   /**
    * Record token usage for a model
    */
@@ -284,29 +269,12 @@ export class QuotaManager {
     quota.usage.tokensUsed += tokensUsed;
     quota.usage.requestsToday += 1;
 
-    const totalUsage = this.getTotalTokensUsedToday();
-    const percentUsed = (totalUsage / this.dailyBudget) * 100;
-
     logger.info('Token usage recorded', {
       model,
       tokensUsed,
-      totalToday: totalUsage,
-      budgetRemaining: this.dailyBudget - totalUsage,
-      percentUsed: percentUsed.toFixed(2),
+      requestsToday: quota.usage.requestsToday,
+      tokensToday: quota.usage.tokensUsed,
     });
-
-    // Alert if approaching budget limits
-    if (percentUsed >= 80 && percentUsed < 90) {
-      logger.warn('⚠️  Approaching daily token budget (80%)', {
-        used: totalUsage,
-        budget: this.dailyBudget,
-      });
-    } else if (percentUsed >= 90) {
-      logger.error('🚨 Critical: Daily token budget nearly exhausted (90%)', {
-        used: totalUsage,
-        budget: this.dailyBudget,
-      });
-    }
   }
 
   /**
@@ -346,12 +314,7 @@ export class QuotaManager {
     this.checkAndResetIfNeeded();
 
     const status: any = {
-      dailyBudget: this.dailyBudget,
-      totalUsed: this.getTotalTokensUsedToday(),
-      percentUsed: (
-        (this.getTotalTokensUsedToday() / this.dailyBudget) *
-        100
-      ).toFixed(2),
+      totalTokensUsed: this.getTotalTokensUsedToday(),
       nextReset: this.getNextResetTime().toISOString(),
       models: {},
     };

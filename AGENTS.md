@@ -256,7 +256,6 @@ const status = quotaManager.getQuotaStatus();
 ```bash
 # .env
 GOOGLE_QUOTA_MANAGEMENT=true      # Enable (default)
-GOOGLE_DAILY_QUOTA=1000000        # 1M tokens/day (default)
 ```
 
 **Free Tier Limits to Remember:**

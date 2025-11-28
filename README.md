@@ -19,8 +19,6 @@ A sophisticated **document-aware PDF summarization system** that treats document
 
 ## 📚 Documentation Structure
 
-**NEW**: Documentation is now organized into logical folders for better navigation!
-
 ```
 docs/
 ├── architecture/          # System architecture and design
@@ -289,7 +287,6 @@ The system automatically distributes your Google Gemini API token budget across 
 ```bash
 # .env
 GOOGLE_QUOTA_MANAGEMENT=true      # Enable (default)
-GOOGLE_DAILY_QUOTA=1000000        # 1M tokens/day (default)
 # No need to specify GOOGLE_MODEL - auto-selected!
 ```
 

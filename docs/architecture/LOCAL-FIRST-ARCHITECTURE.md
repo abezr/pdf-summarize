@@ -6,6 +6,10 @@
 
 ---
 
+> Implementation status: the current codebase still uses PostgreSQL + Redis with local filesystem storage and does not include the SQLite/node-cache/transformers.js stack described below. Treat this document as a future-state specification.
+
+---
+
 ## 🎯 Architecture Philosophy
 
 ### Core Principles

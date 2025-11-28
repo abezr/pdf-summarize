@@ -17,6 +17,17 @@ A sophisticated **document-aware PDF summarization system** that treats document
 
 ---
 
+## Current Implementation Snapshot (Nov 2025)
+
+- Backend API only (Express + TypeScript) with document upload/list/stats/get/summarize/delete endpoints and health checks
+- Data layer is PostgreSQL via `DATABASE_URL` with `node-pg-migrate` migrations in `src/database/migrations`
+- Uploads and extracted assets are written to the local filesystem (see `UPLOAD_DIR` and `./data/images`); no S3/GCS integration today
+- LLM layer includes OpenAI + Google Gemini providers with quota management and graph-aware prompt templates; set `OPENAI_API_KEY` and optionally `GOOGLE_API_KEY`
+- Redis client exists but is only used in the health check; application caching is not wired yet
+- Not yet in this repo: React/Vite UI, Prometheus/Grafana/OpenTelemetry wiring, evaluation/RAGAS service, OCR/Tesseract, or the local-first SQLite/node-cache stack (those remain design docs)
+
+---
+
 ## 📚 Documentation Structure
 
 ```
@@ -264,13 +275,13 @@ PDF → Knowledge Graph (Nodes + Edges) → MCP Retrieval (AI requests nodes) �
 
 ### 🎯 Dynamic Quota Management (NEW!)
 
-**Intelligent Model Selection with Daily Quota Tracking**
+**Intelligent Model Selection with Per-Model Quota Tracking**
 
-The system automatically distributes your Google Gemini API token budget across multiple models, selecting the most appropriate model for each task while respecting daily quota limits.
+The system automatically distributes your Google Gemini API calls across multiple models, selecting the most appropriate model for each task while respecting each model's RPD/RPM/TPM limits.
 
 **Key Features**:
 - 🤖 **Auto-Selection**: Chooses optimal model based on task purpose (6 types)
-- 📊 **Quota Tracking**: Monitors tokens/requests per model + overall budget
+- 📊 **Quota Tracking**: Monitors requests/tokens per model against RPD/RPM/TPM
 - 🔄 **Smart Fallback**: Switches to alternative models when quota exhausted
 - ⏰ **Daily Reset**: Automatically resets at midnight Pacific Time
 - 💰 **97%+ Savings**: Distributes load optimally across free tier models
@@ -335,16 +346,16 @@ GOOGLE_QUOTA_MANAGEMENT=true      # Enable (default)
 
 ### C4 Level 1: System Context
 ```
-User → [PDF Summary AI] → OpenAI/Google → PostgreSQL + Redis + S3 → Prometheus + Grafana
+User → [PDF Summary AI API] → PostgreSQL + Redis (health check) + local filesystem → OpenAI/Google LLM APIs
 ```
 
 ### C4 Level 2: Containers
 ```
-React SPA → API Gateway → Processing Service (5 stages) → Evaluation Service
-                                 ↓
-                        Data Layer (PostgreSQL, Redis, S3)
-                                 ↓
-                        Monitoring (Prometheus, Grafana)
+Client → Express API → Processing Pipeline (parse → graph → summarize)
+                             ↓
+                     Data Layer (PostgreSQL + local storage for uploads/images)
+                             ↓
+                     LLM Providers (OpenAI + Google Gemini)
 ```
 
 ### C4 Level 3: Processing Pipeline (5 Stages)
@@ -370,62 +381,44 @@ React SPA → API Gateway → Processing Service (5 stages) → Evaluation Servi
 
 ### Senior Full-Stack Developer (React/Node.js) with AI Experience
 
-| Requirement | Implementation |
-|-------------|----------------|
-| ✅ TypeScript primary | Backend + Frontend both TypeScript |
-| ✅ Node.js backend | Express + TypeScript services |
-| ✅ React frontend | React 18 + Vite + Tailwind CSS |
-| ✅ AI/LLM experience | Multi-LLM: OpenAI GPT-4o + Google Gemini 1.5 |
-| ✅ Prompt engineering | System prompts + MCP tools + provider abstraction |
-| ✅ Graph data structures | Adjacency list, node indexing |
-| ✅ Data extraction pipelines | PDF → Graph → Summary |
-| ✅ AWS/GCP services | S3 storage, optional Vertex AI |
-| ✅ WebSocket | Real-time progress updates |
-| ✅ Debugging complex systems | Structured logging, tracing |
-| ✅ Docker | Docker Compose setup |
-| ✅ Neo4j/graph DBs | In-memory graph (extensible) |
+| Requirement | Status |
+|-------------|--------|
+| TypeScript primary | Implemented for backend services |
+| Node.js backend | Express + TypeScript API in this repo |
+| React frontend | Not included in this repository (API-first) |
+| AI/LLM experience | OpenAI + Google Gemini providers with quota manager |
+| Prompt engineering | Graph-aware prompt templates for summaries |
+| Graph data structures | Implemented (GraphBuilder + reference detection) |
+| Data extraction pipelines | PDF → Graph → Summary implemented; OCR not yet |
+| Cloud services | PostgreSQL + local filesystem; no S3/GCS wiring |
+| WebSocket | Not implemented |
+| Debugging/observability | Console logger only; no tracing/metrics yet |
+| Docker | docker-compose provided for Postgres/Redis |
+| Graph DBs | In-memory graph model; no Neo4j |
 
 ---
 
 ## 🛠️ Technology Stack
 
-### Backend
-- **Runtime**: Node.js 20+
-- **Language**: TypeScript 5+
-- **Framework**: Express
-- **PDF Processing**: pdf-parse + Tesseract.js (OCR)
-- **AI**: Multi-LLM (OpenAI GPT-4o + Google Gemini 1.5)
-- **Database**: PostgreSQL 15
-- **Cache**: Redis 7
-- **Storage**: AWS S3 / GCS
-
-### Frontend
-- **Framework**: React 18
-- **Language**: TypeScript
-- **Build**: Vite
-- **UI**: Tailwind CSS
-- **State**: Zustand
-- **HTTP**: Axios
-
-### Infrastructure
-- **Containerization**: Docker + Docker Compose
-- **Monitoring**: Prometheus + Grafana
-- **Tracing**: OpenTelemetry
-- **Logging**: Winston/Pino
+- Backend: Node.js 20+, TypeScript 5+, Express, Multer uploads, Zod validation
+- Data: PostgreSQL via `DATABASE_URL` with `node-pg-migrate` migrations (`src/database/migrations`)
+- Storage: Local filesystem for uploads and extracted assets (`UPLOAD_DIR`, `./data/images`); no S3/GCS wiring
+- Caching: Redis client available and health-checked; no application-level cache currently connected
+- PDF/Extraction: `pdf-parse`, `pdfjs-dist`/`pdf2pic` helpers; table detection service exists but is not invoked in the upload flow; OCR/Tesseract not implemented
+- LLM: OpenAI + Google Gemini providers with quota manager, prompt templates, and graph-aware summarization
+- Observability: Console logger placeholder; Prometheus/Grafana/OpenTelemetry not wired up
+- Frontend: Not included in this repository (API-first)
 
 ---
 
 ## 🌟 Key Differentiators
 
-1. **Graph-First**: Documents as knowledge graphs, not strings
-2. **Grounding**: Every statement traceable to source
-3. **MCP Pattern**: LLM-driven context retrieval
-4. **Automatic Proof**: Every summary validated with 8+ metrics (RAGAS + custom)
-5. **Continuous Evaluation**: Built-in quality assurance with pass/fail thresholds
-6. **Multi-LLM Support**: OpenAI + Google AI with automatic provider selection and 55x cost savings
-7. **Cost-Optimized OCR**: Free-tier first strategy (98% documents processed free)
-8. **Production-Ready**: Complete observability stack
-9. **Extensible**: Clear migration path (in-memory → Neo4j)
+1. **Graph-First Processing**: PDF → graph builder → graph-aware summarization pipeline already implemented
+2. **Grounding-Friendly Data**: Nodes carry page/position metadata and reference edges to support traceability
+3. **Multi-LLM Support**: OpenAI + Google Gemini providers with automatic selection and quota-aware fallback
+4. **Cost Awareness**: Prompt templates and quota manager favor cheaper Gemini models by default
+5. **Extensibility Hooks**: Table detection, reference detection, and storage backends are structured for future expansion
+6. **Planned (Not Yet Implemented)**: OCR/Tesseract, evaluation metrics (RAGAS/custom), Prometheus/Grafana/OpenTelemetry, MCP tooling, and Neo4j/graph DB migration remain design-only items
 
 ---
 
@@ -447,42 +440,20 @@ React SPA → API Gateway → Processing Service (5 stages) → Evaluation Servi
 
 ## 📦 Deliverables
 
-### Documentation ✅
-- [x] Complete C4 Architecture (4 levels)
-- [x] Visual Mermaid Diagrams (11 diagrams)
-- [x] Implementation Guide (step-by-step)
-- [x] Quick Reference (cheat sheet)
-- [x] Project Summary (executive overview)
-- [x] Multi-LLM Documentation (3 files + code)
-- [x] OCR Enhancement (2 specifications)
-- [x] AI Agent Guide (AGENT.md)
+### Delivered
+- Backend Express API with document upload/list/get/stats/summarize/delete endpoints and health checks
+- PDF parsing, graph builder (sections/paragraphs/references), and image extraction services
+- Graph-aware summarization service using OpenAI/Google providers with quota manager and prompt templates
+- PostgreSQL schema + migrations and local filesystem storage for uploads/images/graphs
+- Documentation set covering architecture, LLM providers, and implementation guides
 
-### Architecture ✅
-- [x] System Context design
-- [x] Container architecture
-- [x] Component design
-- [x] TypeScript interfaces (25+)
-- [x] Graph data model
-- [x] Evaluation architecture
-- [x] Deployment architecture
-- [x] Multi-LLM provider system
-
-### Code Samples ✅
-- [x] PDF Parser Service
-- [x] Graph Builder Service
-- [x] OpenAI Provider (184 lines)
-- [x] Google Provider (247 lines)
-- [x] LLM Provider Manager (238 lines)
-- [x] MCP Context Retriever
-- [x] Evaluation Engine
-- [x] Upload Controller
-- [x] React Frontend Component
-
-### Infrastructure ✅
-- [x] Docker Compose configuration
-- [x] Dockerfile examples
-- [x] Environment configuration
-- [x] CI/CD pipeline design
+### Not Yet Delivered (Design Docs Only)
+- React/Vite frontend
+- OCR/Tesseract or Vision OCR integration
+- Application caching with Redis or in-memory layers
+- Prometheus/Grafana/OpenTelemetry observability stack
+- Evaluation pipeline (RAGAS/custom metrics) and MCP tooling
+- Local-first SQLite/node-cache/transformers.js stack
 
 ---
 
@@ -503,14 +474,12 @@ React SPA → API Gateway → Processing Service (5 stages) → Evaluation Servi
 
 This architecture demonstrates **senior-level thinking**:
 
-1. ✅ System design before code
-2. ✅ Innovation (graph-based approach)
-3. ✅ Observability built-in
-4. ✅ Production-ready design
-5. ✅ Extensible architecture
-6. ✅ Job requirements alignment
-7. ✅ Multi-LLM cost optimization
-8. ✅ Comprehensive documentation
+1. ✅ System design before code (architecture and data models documented)
+2. ✅ Graph-based document processing implemented end to end
+3. ✅ Multi-LLM provider layer with quota-aware model selection
+4. ✅ Extensible architecture for tables/references/storage backends
+5. ⚠️ Observability/evaluation planned but not implemented yet
+6. ✅ Comprehensive documentation to guide further work
 
 **The core insight**: By treating documents as knowledge graphs and supporting multiple LLM providers with automatic cost optimization, we enable AI to reason about structure and references while minimizing costs, resulting in more precise, grounded, and cost-effective summaries.
 

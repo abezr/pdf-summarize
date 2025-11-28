@@ -249,9 +249,9 @@ flowchart TD
 - ✅ **Daily Reset**: Automatic at midnight Pacific Time
 - ✅ **6 Task Purposes**: bulk, quick, standard, detailed, vision, critical
 - ✅ **Intelligent Selection**: Prioritized model recommendations per purpose
-- ✅ **Quota Awareness**: Checks RPD limits and daily budget before selection
+- ✅ **Quota Awareness**: Checks per-model RPD/RPM/TPM before selection
 - ✅ **Smart Fallback**: Tries all recommended models, then any available
-- ✅ **Cost Tracking**: Records usage, monitors thresholds (80%, 90%)
+- ✅ **Cost Tracking**: Records per-model usage for visibility
 - ✅ **Error Handling**: 429 error with next reset time when all exhausted
 
 ---

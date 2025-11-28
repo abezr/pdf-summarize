@@ -10,6 +10,14 @@ This guide provides a structured reference to all documentation that an AI agent
 
 ---
 
+## Reality Check (current codebase)
+
+- Backend API only: Express + PostgreSQL + Redis (health check) with uploads stored on the local filesystem
+- LLM layer implemented: OpenAI + Google Gemini providers with quota manager (set `OPENAI_API_KEY`; `GOOGLE_API_KEY` optional)
+- Not implemented yet: React/Vite UI, Prometheus/Grafana/OpenTelemetry, RAGAS/evaluation pipeline, OCR/Tesseract, or the local-first SQLite/node-cache design (docs describe future work)
+
+---
+
 ## 📚 Documentation Structure
 
 ```
@@ -248,7 +256,7 @@ console.log(`Used: ${response.model}`); // e.g., "gemini-1.5-flash"
 import { quotaManager } from './services/llm';
 
 const status = quotaManager.getQuotaStatus();
-// Shows: total budget, usage per model, remaining quota, next reset time
+// Shows: per-model RPD/RPM/TPM usage, requests remaining, next reset time
 ```
 
 **Configuration:**

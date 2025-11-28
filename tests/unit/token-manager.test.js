@@ -163,7 +163,7 @@ describe('TokenManager', () => {
     describe('recommendModel', () => {
         test('should recommend model for simple tasks', () => {
             const recommendation = manager.recommendModel('simple');
-            expect(recommendation.recommended).toBe('gemini-1.5-flash-8b');
+            expect(recommendation.recommended).toBe('gemini-2.5-flash');
             expect(recommendation.alternatives).toContain('gpt-3.5-turbo');
         });
         test('should recommend model for complex tasks', () => {

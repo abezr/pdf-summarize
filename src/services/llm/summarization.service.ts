@@ -12,6 +12,8 @@ import {
 } from './prompt-templates';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
+import { evaluationService, EvaluationResult } from '../evaluation';
+import { mcpService, MCPExecutionContext } from '../mcp';
 
 export interface SummarizationOptions {
   type?: SummaryType;
@@ -40,6 +42,7 @@ export interface SummarizationResult {
     sectionsFound: number;
     totalContentLength: number;
   };
+  evaluation?: EvaluationResult; // Optional evaluation results
 }
 
 export class SummarizationService {
@@ -68,7 +71,15 @@ export class SummarizationService {
       const summaryType = options.type || 'executive';
       const maxLength = options.maxLength || 500;
 
-      // Generate prompt using template service
+      // Create MCP execution context for tool usage
+      const mcpContext: MCPExecutionContext = mcpService.createExecutionContext(
+        graph.documentId,
+        graph,
+        8000, // Max tokens for MCP operations
+        1000  // Reserve tokens for final response
+      );
+
+      // Generate prompt using template service with MCP tools
       const promptRequest: SummaryRequest = {
         type: summaryType,
         graph,
@@ -76,6 +87,7 @@ export class SummarizationService {
         focus: options.focus,
         exclude: options.exclude,
         style: options.style,
+        mcpTools: mcpService.getToolSchemas(),
       };
 
       const promptTemplate =
@@ -92,7 +104,7 @@ export class SummarizationService {
         contextLength: promptTemplate.context.length,
       });
 
-      // Prepare LLM request
+      // Prepare LLM request with function calling enabled
       const llmRequest = {
         messages: [
           {
@@ -107,17 +119,63 @@ export class SummarizationService {
         model: options.model,
         maxTokens: Math.min(maxLength * 4, 4096), // Rough token estimation
         temperature: 0.3, // Lower temperature for more consistent summaries
+        tools: mcpService.getToolSchemas(),
+        toolChoice: 'auto' as const, // Let the model decide when to use tools
       };
 
-      // Generate summary using LLM
-      const llmResponse = await llmProviderManager.generateText(
+      // Generate summary using LLM with tool calling
+      let llmResponse = await llmProviderManager.generateText(
         llmRequest,
         options.provider || 'auto'
       );
 
+      // Handle tool calls if present
+      if (llmResponse.toolCalls && llmResponse.toolCalls.length > 0) {
+        logger.debug('Processing tool calls', {
+          toolCallCount: llmResponse.toolCalls.length,
+          documentId: graph.documentId,
+        });
+
+        // Execute tool calls and continue conversation
+        llmResponse = await this.handleToolCalls(llmResponse, mcpContext, options);
+      }
+
       // Calculate processing statistics
       const processingTime = Date.now() - startTime;
       const graphStats = this.calculateGraphStats(graph);
+
+      // Perform evaluation if enabled
+      let evaluationResult: EvaluationResult | undefined;
+      try {
+        const graphPayload =
+          typeof (graph as any).toJSON === 'function'
+            ? (graph as any).toJSON()
+            : null;
+
+        if (graphPayload) {
+          // Extract original text from graph for evaluation
+          const originalText = this.extractOriginalTextFromGraph(graph);
+
+          evaluationResult = await evaluationService.evaluate({
+            documentId: graph.documentId,
+            originalText,
+            summary: llmResponse.content,
+            graph: graphPayload, // Pass graph data for custom metrics
+          });
+
+          logger.info('Summary evaluation completed', {
+            documentId: graph.documentId,
+            overallScore: evaluationResult.overallScore,
+            passed: evaluationResult.passed,
+          });
+        } else {
+          logger.warn('Summary evaluation skipped: graph has no toJSON()');
+        }
+      } catch (evaluationError) {
+        logger.warn('Summary evaluation failed, continuing without evaluation', {
+          error: (evaluationError as Error).message,
+        });
+      }
 
       const result: SummarizationResult = {
         summary: llmResponse.content,
@@ -128,6 +186,7 @@ export class SummarizationService {
         cost: llmResponse.cost,
         processingTime,
         graphStats,
+        evaluation: evaluationResult,
       };
 
       logger.info('Graph summarization completed', {
@@ -137,6 +196,8 @@ export class SummarizationService {
         cost: llmResponse.cost,
         processingTime,
         nodesProcessed: graphStats.nodesProcessed,
+        evaluationScore: evaluationResult?.overallScore,
+        evaluationPassed: evaluationResult?.passed,
       });
 
       return result;
@@ -222,6 +283,30 @@ export class SummarizationService {
   }
 
   /**
+   * Extract original text from graph for evaluation
+   */
+  private extractOriginalTextFromGraph(graph: Graph): string {
+    // Extract text content from graph nodes in document order
+    const textNodes = graph.nodes
+      .filter(node => ['paragraph', 'section', 'heading'].includes(node.type))
+      .sort((a, b) => {
+        // Sort by page and position if available
+        const aPage = a.metadata?.page || 0;
+        const bPage = b.metadata?.page || 0;
+        if (aPage !== bPage) return aPage - bPage;
+
+        const aPos = a.metadata?.position || 0;
+        const bPos = b.metadata?.position || 0;
+        return aPos - bPos;
+      });
+
+    return textNodes
+      .map(node => node.content)
+      .join('\n\n')
+      .substring(0, 10000); // Limit for evaluation (RAGAS token limits)
+  }
+
+  /**
    * Get available summary types
    */
   public getAvailableTypes(): SummaryType[] {
@@ -287,6 +372,100 @@ export class SummarizationService {
       estimatedCost,
       recommendedModel: model,
     };
+  }
+
+  /**
+   * Handle tool calls from the LLM response
+   */
+  private async handleToolCalls(
+    initialResponse: any,
+    mcpContext: MCPExecutionContext,
+    options: SummarizationOptions
+  ): Promise<any> {
+    let currentResponse = initialResponse;
+    const maxToolIterations = 3; // Prevent infinite loops
+    let iteration = 0;
+
+    while (currentResponse.toolCalls && currentResponse.toolCalls.length > 0 && iteration < maxToolIterations) {
+      iteration++;
+
+      // Execute all tool calls
+      const toolResults = [];
+      for (const toolCall of currentResponse.toolCalls) {
+        try {
+          const result = await mcpService.executeTool(
+            toolCall.function.name,
+            JSON.parse(toolCall.function.arguments),
+            mcpContext
+          );
+
+          toolResults.push({
+            tool_call_id: toolCall.id,
+            role: 'tool',
+            name: toolCall.function.name,
+            content: result.success
+              ? JSON.stringify(result.data)
+              : `Error: ${result.error}`,
+          });
+
+          logger.debug('Tool call executed', {
+            toolName: toolCall.function.name,
+            success: result.success,
+            tokensUsed: result.metadata?.tokensUsed,
+          });
+
+        } catch (error) {
+          logger.error('Tool call execution failed', {
+            toolName: toolCall.function.name,
+            error: (error as Error).message,
+          });
+
+          toolResults.push({
+            tool_call_id: toolCall.id,
+            role: 'tool',
+            name: toolCall.function.name,
+            content: `Error: ${(error as Error).message}`,
+          });
+        }
+      }
+
+      // Continue conversation with tool results
+      const followUpRequest = {
+        messages: [
+          ...initialResponse.messages, // Original messages
+          {
+            role: 'assistant',
+            content: currentResponse.content,
+            tool_calls: currentResponse.toolCalls,
+          },
+          ...toolResults,
+        ],
+        model: options.model,
+        maxTokens: Math.min(options.maxLength ? options.maxLength * 4 : 4096, 4096),
+        temperature: 0.3,
+        tools: mcpService.getToolSchemas(),
+        toolChoice: 'auto' as const,
+      };
+
+      currentResponse = await llmProviderManager.generateText(
+        followUpRequest,
+        options.provider || 'auto'
+      );
+
+      logger.debug('Follow-up LLM call completed', {
+        iteration,
+        hasToolCalls: !!(currentResponse.toolCalls && currentResponse.toolCalls.length > 0),
+      });
+    }
+
+    if (iteration >= maxToolIterations) {
+      logger.warn('Reached maximum tool call iterations', {
+        maxIterations: maxToolIterations,
+        finalResponseHasToolCalls: !!(currentResponse.toolCalls && currentResponse.toolCalls.length > 0),
+      });
+    }
+
+    return currentResponse;
   }
 
   /**

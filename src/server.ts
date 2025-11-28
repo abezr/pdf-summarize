@@ -7,9 +7,21 @@ import { db } from './database/client';
 import { redis } from './database/redis';
 import { logger } from './utils/logger';
 import { handleMulterError, uploadSinglePDF } from './api/middleware/upload';
+import { initializeObservability, createMetricsEndpoint, spanHelpers } from './observability';
+import { webSocketService } from './services/websocket.service';
 
 // Validate configuration before starting
 validateConfig();
+
+// Initialize observability stack
+const observabilityResult = initializeObservability('pdf-summary-ai', '1.0.0');
+if (observabilityResult.skipped) {
+  logger.info('Observability initialization skipped (lazy mode)');
+} else if (!observabilityResult.success) {
+  logger.warn('Observability initialization failed, continuing without monitoring', {
+    error: observabilityResult.error,
+  });
+}
 
 const app = express();
 
@@ -61,6 +73,9 @@ app.use(
   })
 );
 
+// Serve minimal static UI (public/index.html)
+app.use(express.static('public'));
+
 // Body parsing middleware
 app.use(
   express.json({
@@ -80,35 +95,61 @@ app.use(
   })
 );
 
-// Request logging middleware
+// Request logging middleware with tracing
 app.use((req, res, next) => {
   const start = Date.now();
   const { method, url, ip } = req;
+  const requestId = req.headers['x-request-id'] || `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-  logger.info('Request received', {
+  // Create a span for the request
+  const span = spanHelpers.startHttpSpan('http.request', method, url);
+  span.setAttributes({
+    'http.request_id': requestId,
+    'http.client_ip': ip || req.socket.remoteAddress || 'unknown',
+    'http.user_agent': req.get('User-Agent') || 'unknown',
+  });
+
+  // Add request ID to response headers
+  res.setHeader('X-Request-ID', requestId);
+
+  // Structured logging with context
+  const requestLogger = logger.withContext({
+    requestId,
     method,
     url,
     ip: ip || req.socket.remoteAddress,
     userAgent: req.get('User-Agent'),
-    timestamp: new Date().toISOString(),
   });
+
+  requestLogger.http(`Request: ${method} ${url}`);
 
   // Log response
   res.on('finish', () => {
     const duration = Date.now() - start;
     const { statusCode } = res;
 
-    logger.info('Request completed', {
-      method,
-      url,
+    span.setAttributes({
+      'http.status_code': statusCode,
+      'http.duration_ms': duration,
+    });
+
+    span.end();
+
+    requestLogger.http(`Response: ${method} ${url} ${statusCode}`, {
       statusCode,
-      duration: `${duration}ms`,
-      timestamp: new Date().toISOString(),
+      duration,
     });
   });
 
+  // Store logger and span in request for use in routes
+  (req as any).logger = requestLogger;
+  (req as any).span = span;
+
   next();
 });
+
+// Metrics endpoint
+app.get('/metrics', createMetricsEndpoint());
 
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
@@ -184,6 +225,10 @@ app.get('/api', (req, res) => {
         summarize: 'POST /api/documents/:id/summarize',
         delete: 'DELETE /api/documents/:id',
       },
+      websockets: {
+        progress: 'WS /ws/progress/{document_id}',
+        description: 'Real-time progress updates for document processing',
+      },
     },
   });
 });
@@ -230,11 +275,17 @@ app.use('/api/*', (req, res) => {
 app.use(handleMulterError);
 
 // Global error handler
-app.use((error: any, req: express.Request, res: express.Response) => {
-  logger.error('Unhandled error', {
-    error: error.message,
-    stack: error.stack,
-    method: req.method,
+app.use(
+  (
+    error: any,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    logger.error('Unhandled error', {
+      error: error.message,
+      stack: error.stack,
+      method: req.method,
     url: req.url,
     body: req.body,
     params: req.params,
@@ -244,24 +295,28 @@ app.use((error: any, req: express.Request, res: express.Response) => {
   // Don't leak error details in production
   const isDevelopment = config.nodeEnv === 'development';
 
-  res.status(error.statusCode || 500).json({
-    error: error.name || 'InternalServerError',
-    message: isDevelopment ? error.message : 'An unexpected error occurred',
-    ...(isDevelopment && { stack: error.stack }),
-    timestamp: new Date().toISOString(),
-  });
-});
+    res.status(error.statusCode || 500).json({
+      error: error.name || 'InternalServerError',
+      message: isDevelopment ? error.message : 'An unexpected error occurred',
+      ...(isDevelopment && { stack: error.stack }),
+      timestamp: new Date().toISOString(),
+    });
+  }
+);
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {
   logger.info(`Received ${signal}, shutting down gracefully`);
 
   try {
+    // Close WebSocket connections
+    webSocketService.shutdown();
+
     // Close database connections
     await db.close();
     await redis.disconnect();
 
-    logger.info('Database and Redis connections closed');
+    logger.info('WebSocket, database and Redis connections closed');
     process.exit(0);
   } catch (error) {
     logger.error('Error during graceful shutdown', {
@@ -281,6 +336,9 @@ const server = app.listen(config.port, () => {
     environment: config.nodeEnv,
     timestamp: new Date().toISOString(),
   });
+
+  // Initialize WebSocket service
+  webSocketService.initialize(server);
 });
 
 // Handle server errors

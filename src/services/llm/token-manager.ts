@@ -64,24 +64,89 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   },
 
   // Google Gemini Models (approximate pricing)
-  'gemini-2.0-flash-exp': {
-    input: 0.001,
-    output: 0.004,
-    currency: 'USD',
-  },
-  'gemini-1.5-flash': {
+  'gemini-2.5-flash': {
     input: 0.0005,
     output: 0.0015,
     currency: 'USD',
   },
-  'gemini-1.5-flash-8b': {
-    input: 0.0002,
-    output: 0.0008,
-    currency: 'USD',
-  },
-  'gemini-1.5-pro': {
+  'gemini-2.5-pro': {
     input: 0.0035,
     output: 0.0105,
+    currency: 'USD',
+  },
+  'gemini-2.5-pro-preview-06-05': {
+    input: 0.0035,
+    output: 0.0105,
+    currency: 'USD',
+  },
+  'gemini-2.5-pro-preview-05-06': {
+    input: 0.0035,
+    output: 0.0105,
+    currency: 'USD',
+  },
+  'gemini-2.5-pro-preview-03-25': {
+    input: 0.0035,
+    output: 0.0105,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-001': {
+    input: 0.0005,
+    output: 0.0015,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash': {
+    input: 0.0005,
+    output: 0.0015,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-lite-001': {
+    input: 0.0004,
+    output: 0.0012,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-lite': {
+    input: 0.0004,
+    output: 0.0012,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-exp': {
+    input: 0,
+    output: 0,
+    currency: 'USD',
+  },
+  'gemini-2.0-pro-exp': {
+    input: 0.00125,
+    output: 0.005,
+    currency: 'USD',
+  },
+  'gemini-2.0-pro-exp-02-05': {
+    input: 0.00125,
+    output: 0.005,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-thinking-exp': {
+    input: 0,
+    output: 0,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-thinking-exp-01-21': {
+    input: 0,
+    output: 0,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-thinking-exp-1219': {
+    input: 0,
+    output: 0,
+    currency: 'USD',
+  },
+  'gemini-2.0-flash-exp-image-generation': {
+    input: 0,
+    output: 0,
+    currency: 'USD',
+  },
+  'gemini-exp-1206': {
+    input: 0,
+    output: 0,
     currency: 'USD',
   },
 };
@@ -322,10 +387,10 @@ export class TokenManager {
     reasoning: string;
   } {
     const recommendations = {
-      simple: ['gemini-1.5-flash-8b', 'gpt-3.5-turbo', 'gemini-1.5-flash'],
-      complex: ['gpt-4o', 'gemini-1.5-pro', 'gpt-4-turbo'],
-      creative: ['gpt-4o', 'gemini-1.5-pro', 'gpt-4-turbo'],
-      analysis: ['gemini-1.5-pro', 'gpt-4o', 'gpt-4-turbo'],
+      simple: ['gemini-2.5-flash', 'gpt-3.5-turbo'],
+      complex: ['gpt-4o', 'gemini-2.5-pro', 'gpt-4-turbo'],
+      creative: ['gpt-4o', 'gemini-2.5-pro', 'gpt-4-turbo'],
+      analysis: ['gemini-2.5-pro', 'gpt-4o', 'gpt-4-turbo'],
     };
 
     const candidates = recommendations[taskType] || recommendations.simple;

@@ -4,6 +4,7 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import https from 'https';
 import {
   ILLMProvider,
   LLMRequest,
@@ -17,24 +18,43 @@ import { quotaManager, QuotaManager, TaskPurpose } from './QuotaManager';
 export class GoogleProvider implements ILLMProvider {
   public readonly name = 'google';
   public readonly supportedModels = [
+    // 2.5 family (present on this key)
+    'gemini-2.5-pro',
+    'gemini-2.5-pro-preview-06-05',
+    'gemini-2.5-pro-preview-05-06',
+    'gemini-2.5-pro-preview-03-25',
+    'gemini-2.5-flash',
+
+    // 2.0 family (present on this key)
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite-001',
+    'gemini-2.0-flash-lite',
     'gemini-2.0-flash-exp',
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
+    'gemini-2.0-pro-exp',
+    'gemini-2.0-pro-exp-02-05',
+    'gemini-2.0-flash-thinking-exp',
+    'gemini-2.0-flash-thinking-exp-01-21',
+    'gemini-2.0-flash-thinking-exp-1219',
+    'gemini-2.0-flash-exp-image-generation',
+
+    // Experimental older ID still exposed
     'gemini-exp-1206',
-    'gemini-pro',
-    'gemini-pro-vision',
   ];
 
   private client: GoogleGenerativeAI | null = null;
   private apiKey: string | null = null;
   private enableQuotaManagement: boolean;
+  private availableModels: Set<string> = new Set();
+  private modelsLoaded = false;
+  private modelsLoadPromise: Promise<void> | null = null;
 
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || null;
     // Enable quota management by default (disable with GOOGLE_QUOTA_MANAGEMENT=false)
     this.enableQuotaManagement =
       process.env.GOOGLE_QUOTA_MANAGEMENT !== 'false';
+    this.availableModels = new Set(this.supportedModels);
 
     if (this.apiKey) {
       this.client = new GoogleGenerativeAI(this.apiKey);
@@ -56,17 +76,16 @@ export class GoogleProvider implements ILLMProvider {
       throw new AppError('Google AI provider not available', 503);
     }
 
-    const startTime = Date.now();
+    await this.ensureModelsLoaded();
+
+    const inputText = JSON.stringify(request.messages);
+    const estimatedTokens =
+      QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
 
     // Intelligent model selection based on quota management
     let modelName: string;
     if (this.enableQuotaManagement && !request.model) {
-      // Auto-select model based on task purpose and available quota
       const purpose = this.inferTaskPurpose(request);
-      const inputText = JSON.stringify(request.messages);
-      const estimatedTokens =
-        QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
-
       modelName = quotaManager.selectModel(purpose, estimatedTokens);
       logger.info('Model auto-selected by quota manager', {
         purpose,
@@ -74,15 +93,10 @@ export class GoogleProvider implements ILLMProvider {
         estimatedTokens,
       });
     } else {
-      // Use explicitly requested model or fallback to default
-      modelName = request.model || 'gemini-1.5-flash';
+      modelName = request.model || 'gemini-2.5-flash';
 
       // Check quota even for explicit model requests
       if (this.enableQuotaManagement) {
-        const inputText = JSON.stringify(request.messages);
-        const estimatedTokens =
-          QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
-
         if (!quotaManager.hasAvailableQuota(modelName, estimatedTokens)) {
           logger.warn(
             `Requested model ${modelName} has no quota, attempting fallback`
@@ -93,81 +107,105 @@ export class GoogleProvider implements ILLMProvider {
       }
     }
 
-    try {
-      logger.info('Generating text with Google AI', { model: modelName });
+    const candidates = this.filterAvailable(
+      this.buildModelFallbackChain(modelName)
+    );
+    let lastError: any = null;
 
-      const model = this.client.getGenerativeModel({ model: modelName });
+    for (const candidate of candidates) {
+      const apiModel = this.normalizeModelName(candidate);
+      const startTime = Date.now();
 
-      // Convert messages to Gemini format
-      const contents = this.convertMessagesToGeminiFormat(request.messages);
-
-      const result = await model.generateContent({
-        contents,
-        generationConfig: {
-          maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.3,
-          topP: request.topP ?? 0.9,
-        },
-      });
-
-      const response = await result.response;
-      const content = response.text();
-
-      // Estimate token usage (Gemini doesn't provide exact counts in all cases)
-      const tokensUsed = {
-        prompt: this.estimateTokens(JSON.stringify(contents)),
-        completion: this.estimateTokens(content),
-        total: 0,
-      };
-      tokensUsed.total = tokensUsed.prompt + tokensUsed.completion;
-
-      // Record usage in quota manager
-      if (this.enableQuotaManagement) {
-        quotaManager.recordUsage(modelName, tokensUsed.total);
-      }
-
-      // Calculate cost (Google AI pricing)
-      const cost = this.calculateCost(modelName, tokensUsed);
-      const processingTime = Date.now() - startTime;
-
-      logger.info('Google AI text generation completed', {
-        model: modelName,
-        tokensUsed: tokensUsed.total,
-        cost,
-        processingTime,
-        quotaManaged: this.enableQuotaManagement,
-      });
-
-      return {
-        content,
-        model: modelName,
-        provider: 'google',
-        tokensUsed,
-        cost,
-        processingTime,
-      };
-    } catch (error: any) {
-      logger.error('Google AI text generation failed', {
-        error: error.message,
-      });
-
-      if (error.message?.includes('API key')) {
-        throw new AppError('Invalid Google API key', 401);
-      }
-      if (
-        error.message?.includes('quota') ||
-        error.message?.includes('rate limit')
-      ) {
-        throw new AppError('Google AI quota exceeded', 429, {
-          message: 'Daily quota exhausted. Please try again tomorrow.',
-          resetTime: quotaManager.getQuotaStatus().nextReset,
+      try {
+        logger.info('Generating text with Google AI', {
+          model: apiModel,
+          friendlyModel: candidate,
         });
-      }
 
-      throw new AppError('Google AI request failed', 500, {
-        originalError: error,
+        const model = this.client.getGenerativeModel({ model: apiModel });
+
+        // Convert messages to Gemini format
+        const contents = this.convertMessagesToGeminiFormat(request.messages);
+
+        const result = await model.generateContent({
+          contents,
+          generationConfig: {
+            maxOutputTokens: request.maxTokens || 4096,
+            temperature: request.temperature ?? 0.3,
+            topP: request.topP ?? 0.9,
+          },
+        });
+
+        const response = await result.response;
+        const content = response.text();
+
+        // Estimate token usage (Gemini doesn't provide exact counts in all cases)
+        const tokensUsed = {
+          prompt: this.estimateTokens(JSON.stringify(contents)),
+          completion: this.estimateTokens(content),
+          total: 0,
+        };
+        tokensUsed.total = tokensUsed.prompt + tokensUsed.completion;
+
+        // Record usage in quota manager
+        if (this.enableQuotaManagement) {
+          quotaManager.recordUsage(candidate, tokensUsed.total);
+        }
+
+        // Calculate cost (Google AI pricing)
+        const cost = this.calculateCost(candidate, tokensUsed);
+        const processingTime = Date.now() - startTime;
+
+        logger.info('Google AI text generation completed', {
+          model: candidate,
+          apiModel,
+          tokensUsed: tokensUsed.total,
+          cost,
+          processingTime,
+          quotaManaged: this.enableQuotaManagement,
+        });
+
+        return {
+          content,
+          model: candidate,
+          provider: 'google',
+          tokensUsed,
+          cost,
+          processingTime,
+        };
+      } catch (error: any) {
+        lastError = error;
+        logger.warn('Google AI text generation failed, trying fallback', {
+          error: error.message,
+          modelTried: apiModel,
+          friendlyModel: candidate,
+        });
+
+        const message = (error.message || '').toLowerCase();
+        const modelNotFound =
+          message.includes('not found') || message.includes('404');
+        if (!modelNotFound) {
+          break; // Non-404 error, stop trying fallbacks
+        }
+      }
+    }
+
+    if (lastError?.message?.includes('API key')) {
+      throw new AppError('Invalid Google API key', 401);
+    }
+    if (
+      lastError?.message?.toLowerCase().includes('quota') ||
+      lastError?.message?.toLowerCase().includes('rate limit')
+    ) {
+      throw new AppError('Google AI quota exceeded', 429, {
+        message: 'Daily quota exhausted. Please try again tomorrow.',
+        resetTime: quotaManager.getQuotaStatus().nextReset,
       });
     }
+
+    throw new AppError('Google AI request failed', 500, {
+      originalError: lastError,
+    });
   }
 
   /**
@@ -215,10 +253,11 @@ export class GoogleProvider implements ILLMProvider {
       throw new AppError('Google AI provider not available', 503);
     }
 
+    await this.ensureModelsLoaded();
     const startTime = Date.now();
 
     // Select model for vision task based on quota
-    let modelName = 'gemini-1.5-pro'; // Default for vision
+    let modelName = 'gemini-2.5-pro'; // Default for vision
     if (this.enableQuotaManagement) {
       const estimatedTokens = this.estimateTokens(request.prompt) + 1000; // Image + response tokens
       try {
@@ -227,8 +266,12 @@ export class GoogleProvider implements ILLMProvider {
           estimatedTokens
         );
         // Ensure selected model supports vision
-        if (!modelName.includes('flash') && !modelName.includes('pro')) {
-          modelName = 'gemini-1.5-flash'; // Fallback to flash for vision
+        if (
+          !modelName.includes('flash') &&
+          !modelName.includes('pro') &&
+          !modelName.includes('vision')
+        ) {
+          modelName = 'gemini-2.5-flash'; // Fallback to flash for vision
         }
       } catch (error) {
         logger.warn('No quota available for vision, using default', { error });
@@ -240,7 +283,9 @@ export class GoogleProvider implements ILLMProvider {
         model: modelName,
       });
 
-      const model = this.client.getGenerativeModel({ model: modelName });
+      const model = this.client.getGenerativeModel({
+        model: this.normalizeModelName(modelName),
+      });
 
       const result = await model.generateContent([
         request.prompt,
@@ -369,15 +414,32 @@ export class GoogleProvider implements ILLMProvider {
     // Google AI pricing (as of 2024)
     // Free tier usage is $0, but we track theoretical costs
     const pricing: Record<string, { input: number; output: number }> = {
-      'gemini-2.0-flash-exp': { input: 0, output: 0 }, // Experimental - free
-      'gemini-1.5-pro': { input: 0.00125, output: 0.005 }, // per 1K tokens
-      'gemini-1.5-flash': { input: 0.000075, output: 0.0003 },
-      'gemini-1.5-flash-8b': { input: 0.0000375, output: 0.00015 }, // Half of flash
+      // 2.5 family (approximate; adjust if billing enabled)
+      'gemini-2.5-flash': { input: 0.0005, output: 0.0015 },
+      'gemini-2.5-pro': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-06-05': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-05-06': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-03-25': { input: 0.0035, output: 0.0105 },
+
+      // 2.0 family
+      'gemini-2.0-flash-001': { input: 0.0005, output: 0.0015 },
+      'gemini-2.0-flash': { input: 0.0005, output: 0.0015 },
+      'gemini-2.0-flash-lite-001': { input: 0.0004, output: 0.0012 },
+      'gemini-2.0-flash-lite': { input: 0.0004, output: 0.0012 },
+      'gemini-2.0-flash-exp': { input: 0, output: 0 },
+      'gemini-2.0-pro-exp': { input: 0.00125, output: 0.005 },
+      'gemini-2.0-pro-exp-02-05': { input: 0.00125, output: 0.005 },
+      'gemini-2.0-flash-thinking-exp': { input: 0, output: 0 },
+      'gemini-2.0-flash-thinking-exp-01-21': { input: 0, output: 0 },
+      'gemini-2.0-flash-thinking-exp-1219': { input: 0, output: 0 },
+      'gemini-2.0-flash-exp-image-generation': { input: 0, output: 0 },
+
+      // Experimental older ID
       'gemini-exp-1206': { input: 0, output: 0 }, // Experimental - free
-      'gemini-pro': { input: 0.0005, output: 0.0015 },
     };
 
-    const modelPricing = pricing[model] || pricing['gemini-1.5-flash'];
+    const modelPricing =
+      pricing[model] || pricing['gemini-2.5-flash'] || { input: 0, output: 0 };
     const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
     const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
 
@@ -387,10 +449,17 @@ export class GoogleProvider implements ILLMProvider {
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;
 
+    await this.ensureModelsLoaded();
+
     try {
       // Use cheapest model for health check
+      const [firstAvailable] =
+        this.filterAvailable(['gemini-2.5-flash', ...this.supportedModels]) ||
+        [];
+      const modelId =
+        firstAvailable || this.filterAvailable(this.supportedModels)[0];
       const model = this.client.getGenerativeModel({
-        model: 'gemini-1.5-flash-8b',
+        model: this.normalizeModelName(modelId),
       });
       await model.generateContent('Hello');
       return true;
@@ -425,5 +494,134 @@ export class GoogleProvider implements ILLMProvider {
       quotaManager.forceReset();
       logger.info('Quotas manually reset');
     }
+  }
+
+  /**
+   * Map friendly model names to API-ready model identifiers.
+   * Keep explicit model IDs to maximize compatibility.
+   */
+  private normalizeModelName(model: string): string {
+    // Pass through known IDs
+    if (this.availableModels.has(model) || this.supportedModels.includes(model))
+      return model;
+    return model;
+  }
+
+  /**
+   * Build a prioritized list of models to try, based on availability quirks.
+   */
+  private buildModelFallbackChain(preferred: string): string[] {
+    const chain = [
+      preferred,
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-flash-001',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite-001',
+      'gemini-2.0-pro-exp',
+      'gemini-2.0-pro-exp-02-05',
+      'gemini-2.0-flash-exp',
+      'gemini-2.0-flash-thinking-exp',
+      'gemini-2.0-flash-thinking-exp-01-21',
+      'gemini-2.0-flash-thinking-exp-1219',
+      'gemini-exp-1206',
+    ];
+
+    // Remove duplicates while preserving order
+    return Array.from(new Set(chain));
+  }
+
+  /**
+   * Ensure we have an up-to-date list of models available to this API key.
+   */
+  private async ensureModelsLoaded(): Promise<void> {
+    if (this.modelsLoaded) return;
+    if (this.modelsLoadPromise) return this.modelsLoadPromise;
+
+    this.modelsLoadPromise = this.refreshAvailableModels();
+    await this.modelsLoadPromise;
+  }
+
+  /**
+   * Fetch available models from Google and cache the short names.
+   */
+  private async refreshAvailableModels(): Promise<void> {
+    if (!this.apiKey) {
+      this.modelsLoaded = true;
+      return;
+    }
+
+    try {
+      const names = await this.listModelsFromAPI();
+
+      if (names.length > 0) {
+        this.availableModels = new Set(
+          names.filter((n) => this.supportedModels.includes(n))
+        );
+        // Always keep supported as fallback
+        for (const n of this.supportedModels) this.availableModels.add(n);
+        this.modelsLoaded = true;
+        logger.info('Google models refreshed from ListModels', {
+          count: this.availableModels.size,
+        });
+        return;
+      }
+    } catch (error: any) {
+      logger.warn('Failed to refresh Google model list, using defaults', {
+        error: error?.message || String(error),
+      });
+    }
+
+    // Fallback: use supported list
+    this.availableModels = new Set(this.supportedModels);
+    this.modelsLoaded = true;
+  }
+
+  /**
+   * Call ListModels using https (avoids DOM fetch typings).
+   */
+  private async listModelsFromAPI(): Promise<string[]> {
+    const url = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`
+    );
+
+    return new Promise((resolve) => {
+      const req = https.get(url, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            const body = JSON.parse(raw) as { models?: Array<{ name: string }> };
+            const names =
+              body.models?.map((m) => m.name.replace(/^models\//, '')) || [];
+            resolve(names);
+          } catch (err) {
+            logger.warn('Failed parsing ListModels response', {
+              error: (err as Error).message,
+            });
+            resolve([]);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        logger.warn('ListModels request failed', { error: err.message });
+        resolve([]);
+      });
+
+      req.setTimeout(5000, () => {
+        req.destroy(new Error('timeout'));
+        resolve([]);
+      });
+    });
+  }
+
+  /**
+   * Filter a chain to models we know are available.
+   */
+  private filterAvailable(models: string[]): string[] {
+    const filtered = models.filter((m) => this.availableModels.has(m));
+    return filtered.length > 0 ? filtered : models;
   }
 }

@@ -45,31 +45,24 @@ export type TaskPurpose =
  * Updated based on official documentation
  */
 export const GEMINI_FREE_TIER_LIMITS: Record<string, ModelQuotaLimits> = {
-  'gemini-2.0-flash-exp': {
-    rpm: 10,
-    tpm: 4_000_000,
-    rpd: 1500,
-  },
-  'gemini-1.5-flash': {
-    rpm: 15,
-    tpm: 1_000_000,
-    rpd: 1500,
-  },
-  'gemini-1.5-flash-8b': {
-    rpm: 15,
-    tpm: 4_000_000,
-    rpd: 1500,
-  },
-  'gemini-1.5-pro': {
-    rpm: 2,
-    tpm: 32_000,
-    rpd: 50,
-  },
-  'gemini-exp-1206': {
-    rpm: 2,
-    tpm: 32_000,
-    rpd: 50,
-  },
+  // Gemini 2.5 (available on this key)
+  'gemini-2.5-flash': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.5-pro': { rpm: 5, tpm: 128_000, rpd: 50 },
+
+  // Gemini 2.0 family (available on this key)
+  'gemini-2.0-flash-001': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash-lite-001': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash-lite': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash-exp': { rpm: 15, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-pro-exp': { rpm: 5, tpm: 128_000, rpd: 50 },
+  'gemini-2.0-pro-exp-02-05': { rpm: 5, tpm: 128_000, rpd: 50 },
+  'gemini-2.0-flash-thinking-exp': { rpm: 10, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash-thinking-exp-01-21': { rpm: 10, tpm: 1_000_000, rpd: 1500 },
+  'gemini-2.0-flash-thinking-exp-1219': { rpm: 10, tpm: 1_000_000, rpd: 1500 },
+
+  // Experimental / legacy still exposed on the key
+  'gemini-exp-1206': { rpm: 2, tpm: 32_000, rpd: 50 },
 };
 
 /**
@@ -77,31 +70,53 @@ export const GEMINI_FREE_TIER_LIMITS: Record<string, ModelQuotaLimits> = {
  */
 const MODEL_RECOMMENDATIONS: Record<TaskPurpose, string[]> = {
   'bulk-processing': [
-    'gemini-1.5-flash-8b',
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite-001',
+    'gemini-2.5-pro',
+    'gemini-2.0-pro-exp',
+    'gemini-exp-1206',
   ],
   'quick-summary': [
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash-lite-001',
+    'gemini-2.0-flash',
     'gemini-2.0-flash-exp',
-    'gemini-1.5-flash',
-    'gemini-1.5-flash-8b',
   ],
   'standard-analysis': [
-    'gemini-1.5-flash',
-    'gemini-2.0-flash-exp',
-    'gemini-1.5-pro',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.0-pro-exp',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+    'gemini-exp-1206',
   ],
   'detailed-analysis': [
-    'gemini-1.5-pro',
+    'gemini-2.5-pro',
+    'gemini-2.0-pro-exp',
     'gemini-exp-1206',
-    'gemini-1.5-flash',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
   ],
   'vision-analysis': [
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-pro',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite-001',
     'gemini-2.0-flash-exp',
   ],
-  'critical-task': ['gemini-1.5-pro', 'gemini-exp-1206', 'gemini-1.5-flash'],
+  'critical-task': [
+    'gemini-2.5-pro',
+    'gemini-2.0-pro-exp',
+    'gemini-exp-1206',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+  ],
 };
 
 /**

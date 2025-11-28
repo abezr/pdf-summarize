@@ -46,6 +46,14 @@ describe('Environment Configuration', () => {
       expect(() => validateConfig()).not.toThrow();
     });
 
+    it('should not throw when only GOOGLE_API_KEY is present', () => {
+      process.env.DATABASE_URL = 'postgresql://test';
+      delete process.env.OPENAI_API_KEY;
+      process.env.GOOGLE_API_KEY = 'google-test';
+
+      expect(() => validateConfig()).not.toThrow();
+    });
+
     it('should throw when DATABASE_URL is missing', () => {
       delete process.env.DATABASE_URL;
       process.env.OPENAI_API_KEY = 'sk-test';
@@ -53,18 +61,24 @@ describe('Environment Configuration', () => {
       expect(() => validateConfig()).toThrow('Missing required env vars: DATABASE_URL');
     });
 
-    it('should throw when OPENAI_API_KEY is missing', () => {
+    it('should throw when all LLM provider keys are missing', () => {
       process.env.DATABASE_URL = 'postgresql://test';
       delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
 
-      expect(() => validateConfig()).toThrow('Missing required env vars: OPENAI_API_KEY');
+      expect(() => validateConfig()).toThrow(
+        'Missing required env vars: OPENAI_API_KEY or GOOGLE_API_KEY'
+      );
     });
 
     it('should throw when multiple env vars are missing', () => {
       delete process.env.DATABASE_URL;
       delete process.env.OPENAI_API_KEY;
+      delete process.env.GOOGLE_API_KEY;
 
-      expect(() => validateConfig()).toThrow('Missing required env vars: DATABASE_URL, OPENAI_API_KEY');
+      expect(() => validateConfig()).toThrow(
+        'Missing required env vars: DATABASE_URL, OPENAI_API_KEY or GOOGLE_API_KEY'
+      );
     });
   });
 });

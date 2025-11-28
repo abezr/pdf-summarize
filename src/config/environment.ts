@@ -22,8 +22,18 @@ export const config = {
 
 // Validate required env vars
 export function validateConfig(): void {
-  const required = ['DATABASE_URL', 'OPENAI_API_KEY'];
-  const missing = required.filter((key) => !process.env[key]);
+  const missing: string[] = [];
+
+  if (!process.env.DATABASE_URL) {
+    missing.push('DATABASE_URL');
+  }
+
+  const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+  const hasGoogle = Boolean(process.env.GOOGLE_API_KEY);
+
+  if (!hasOpenAI && !hasGoogle) {
+    missing.push('OPENAI_API_KEY or GOOGLE_API_KEY');
+  }
 
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);

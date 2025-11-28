@@ -14,6 +14,7 @@ import {
   ExtractedImage,
 } from '../../services/image-extraction.service';
 import { logger } from '../../utils/logger';
+import { ProgressTrackerService } from '../../services/progress-tracker.service';
 import {
   DocumentQueryParams,
   DocumentIdParams,
@@ -210,6 +211,108 @@ export class DocumentController {
   }
 
   /**
+   * Evaluate a document summary
+   * POST /api/documents/:id/evaluate
+   */
+  public async evaluateDocument(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
+      const params: DocumentIdParams = validatePathParams(
+        DocumentIdParamSchema,
+        req.params
+      );
+
+      // Verify document exists and has summary
+      const document = await documentService.validateDocumentAccess(
+        params.id,
+        userId
+      );
+
+      if (!document.summary) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'NO_SUMMARY',
+            message: 'Document must have a summary before evaluation',
+          },
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      logger.info('Evaluating document summary', {
+        documentId: params.id,
+        userId,
+      });
+
+      // Extract original text from graph for evaluation
+      const originalText = this.extractOriginalTextFromGraph(document.graph_data);
+
+      // Perform evaluation
+      const evaluationResult = await evaluationService.evaluate({
+        documentId: params.id,
+        originalText,
+        summary: document.summary,
+        graph: document.graph_data.toJSON(),
+      });
+
+      res.json({
+        success: true,
+        data: {
+          evaluation: {
+            overall_score: evaluationResult.overallScore,
+            passed: evaluationResult.passed,
+            ragas_metrics: evaluationResult.ragasMetrics,
+            custom_metrics: evaluationResult.customMetrics,
+            recommendations: evaluationResult.recommendations,
+            thresholds: evaluationResult.thresholds,
+          },
+        },
+        message: 'Evaluation completed successfully',
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error: any) {
+      logger.error('Failed to evaluate document', {
+        documentId: req.params.id,
+        error: error.message,
+      });
+
+      res.status(error.statusCode || 500).json({
+        success: false,
+        error: {
+          code: error.code || 'EVALUATION_FAILED',
+          message: error.message || 'Failed to evaluate document',
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }
+
+  /**
+   * Extract original text from graph for evaluation
+   */
+  private extractOriginalTextFromGraph(graph: any): string {
+    // Extract text content from graph nodes in document order
+    const textNodes = graph.nodes
+      .filter((node: any) => ['paragraph', 'section', 'heading'].includes(node.type))
+      .sort((a: any, b: any) => {
+        // Sort by page and position if available
+        const aPage = a.metadata?.page || 0;
+        const bPage = b.metadata?.page || 0;
+        if (aPage !== bPage) return aPage - bPage;
+
+        const aPos = a.metadata?.position || 0;
+        const bPos = b.metadata?.position || 0;
+        return aPos - bPos;
+      });
+
+    return textNodes
+      .map((node: any) => node.content)
+      .join('\n\n')
+      .substring(0, 10000); // Limit for evaluation (RAGAS token limits)
+  }
+
+  /**
    * Delete document
    * DELETE /api/documents/:id
    */
@@ -332,6 +435,9 @@ export class DocumentController {
         userId,
       });
 
+      // Send initial progress update
+      await ProgressTrackerService.updateSummarizationProgress(params.id, 0, 'Starting summarization process');
+
       // Generate summary
       const summaryResult = await summarizationService.summarizeGraph(
         document.graph_data,
@@ -346,12 +452,39 @@ export class DocumentController {
         }
       );
 
+      await ProgressTrackerService.updateSummarizationProgress(params.id, 80, 'Summary generated, running evaluation');
+
       // Store summary in document
       await documentService.storeDocumentSummary(
         params.id,
         summaryResult.summary,
         userId
       );
+
+      await ProgressTrackerService.updateSummarizationProgress(params.id, 90, 'Summary stored, finalizing');
+
+      // Prepare summary data for WebSocket
+      const summaryData = {
+        content: summaryResult.summary,
+        type: summaryResult.type,
+        model: summaryResult.model,
+        provider: summaryResult.provider,
+        tokens_used: summaryResult.tokensUsed,
+        cost: summaryResult.cost,
+        processing_time: summaryResult.processingTime,
+        graph_stats: summaryResult.graphStats,
+      };
+
+      const evaluationData = summaryResult.evaluation ? {
+        overall_score: summaryResult.evaluation.overallScore,
+        passed: summaryResult.evaluation.passed,
+        ragas_metrics: summaryResult.evaluation.ragasMetrics,
+        custom_metrics: summaryResult.evaluation.customMetrics,
+        recommendations: summaryResult.evaluation.recommendations,
+      } : undefined;
+
+      // Send completion message via WebSocket
+      await ProgressTrackerService.markComplete(params.id, summaryData, evaluationData);
 
       res.json({
         success: true,
@@ -364,6 +497,7 @@ export class DocumentController {
           cost: summaryResult.cost,
           processing_time: summaryResult.processingTime,
           graph_stats: summaryResult.graphStats,
+          evaluation: evaluationData,
         },
         message: 'Summary generated successfully',
         timestamp: new Date().toISOString(),
@@ -373,6 +507,13 @@ export class DocumentController {
         documentId: req.params.id,
         error: error.message,
       });
+
+      // Send error message via WebSocket
+      const documentId = req.params.id;
+      await ProgressTrackerService.sendError(documentId, {
+        code: error.name || 'SUMMARIZATION_ERROR',
+        message: error.message || 'Failed to generate document summary',
+      }, 'SUMMARIZATION');
 
       res.status(error.statusCode || 500).json({
         success: false,
@@ -407,18 +548,23 @@ export class DocumentController {
           userId
         );
 
-        // Parse PDF
+        // Stage 1: Parse PDF
+        await ProgressTrackerService.updateParsingProgress(documentId, 0, 'Reading PDF file');
         const fileBuffer = await fs.promises.readFile(filePath);
+        await ProgressTrackerService.updateParsingProgress(documentId, 50, 'Parsing PDF content');
+
         const pdfResult = await pdfParserService.parsePDF(fileBuffer, fileName);
         logger.info('PDF parsed successfully', {
           documentId,
           pages: pdfResult.pages.length,
           totalChars: pdfResult.fullText.length,
         });
+        await ProgressTrackerService.updateParsingProgress(documentId, 100, 'PDF parsing complete');
 
-        // Extract images from PDF
+        // Stage 2: Extract images from PDF
         let images: ExtractedImage[] = [];
         try {
+          await ProgressTrackerService.updateImageExtractionProgress(documentId, 0, 'Extracting images from PDF');
           const outputDir = `./data/images/${documentId}`;
           images = await imageExtractionService.extractImages(
             filePath,
@@ -428,6 +574,7 @@ export class DocumentController {
             documentId,
             imageCount: images.length,
           });
+          await ProgressTrackerService.updateImageExtractionProgress(documentId, 100, `Extracted ${images.length} images`);
         } catch (error: any) {
           logger.warn('Image extraction failed, continuing without images', {
             documentId,
@@ -436,7 +583,8 @@ export class DocumentController {
           // Continue processing even if image extraction fails
         }
 
-        // Build graph
+        // Stage 3: Build graph
+        await ProgressTrackerService.updateGraphBuildProgress(documentId, 0, 'Building document graph');
         const graph = await GraphBuilder.buildGraph(
           documentId,
           pdfResult,
@@ -448,6 +596,7 @@ export class DocumentController {
           nodes: graph.nodes.length,
           edges: graph.edges.length,
         });
+        await ProgressTrackerService.updateGraphBuildProgress(documentId, 100, `Graph built with ${graph.nodes.length} nodes and ${graph.edges.length} edges`);
 
         // Store graph data
         await documentService.storeDocumentGraph(documentId, graph, userId);
@@ -466,6 +615,12 @@ export class DocumentController {
           documentId,
           error: error.message,
         });
+
+        // Send error message via WebSocket
+        await ProgressTrackerService.sendError(documentId, {
+          code: 'PROCESSING_FAILED',
+          message: error.message,
+        }, 'FAILED');
 
         // Update status to failed
         await documentService.updateDocumentStatus(

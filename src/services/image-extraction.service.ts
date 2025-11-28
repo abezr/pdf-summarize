@@ -362,7 +362,7 @@ export class ImageExtractionService {
   getHealthStatus() {
     return {
       pdf2picAvailable: !!this.pdf2picOptions,
-      sharpAvailable: true, // sharp is imported
+      sharpAvailable: true, // sharp is available
       overallHealthy: !!this.pdf2picOptions,
     };
   }

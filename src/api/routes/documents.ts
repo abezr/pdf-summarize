@@ -62,6 +62,15 @@ router.post(
 );
 
 /**
+ * Evaluate a document summary
+ * POST /api/documents/:id/evaluate
+ */
+router.post(
+  '/:id/evaluate',
+  documentController.evaluateDocument.bind(documentController)
+);
+
+/**
  * Delete document
  * DELETE /api/documents/:id
  */

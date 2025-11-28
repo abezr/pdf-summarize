@@ -8,6 +8,7 @@ import {
   ReferenceResolutionService,
   ResolutionContext,
 } from './reference-resolution.service';
+import { embeddingsService } from '../embeddings';
 import { logger } from '../../utils/logger';
 
 /**
@@ -41,6 +42,29 @@ export class GraphBuilder {
 
       // Build the graph structure
       await this.buildGraphStructure(graph, pdfResult, tables, images);
+
+      // Generate embeddings and semantic edges
+      try {
+        await embeddingsService.generateGraphEmbeddings(graph);
+
+        const semanticEdges = await embeddingsService.generateSemanticEdges(graph);
+        for (const edge of semanticEdges) {
+          graph.addEdge(edge.from, edge.to, edge.type, {
+            weight: edge.weight,
+            ...edge.metadata,
+          });
+        }
+
+        logger.info('Embeddings and semantic edges added to graph', {
+          documentId,
+          semanticEdgesGenerated: semanticEdges.length,
+        });
+      } catch (embeddingsError) {
+        logger.warn('Embeddings processing failed, continuing without semantic features', {
+          documentId,
+          error: (embeddingsError as Error).message,
+        });
+      }
 
       // Mark as complete and calculate processing time
       const processingTime = Date.now() - startTime;

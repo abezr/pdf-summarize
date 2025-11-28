@@ -24,7 +24,7 @@ A sophisticated **document-aware PDF summarization system** that treats document
 - Uploads and extracted assets are written to the local filesystem (see `UPLOAD_DIR` and `./data/images`); no S3/GCS integration today
 - LLM layer includes OpenAI + Google Gemini providers with quota management and graph-aware prompt templates; set `OPENAI_API_KEY` and optionally `GOOGLE_API_KEY`
 - Redis client exists but is only used in the health check; application caching is not wired yet
-- Not yet in this repo: React/Vite UI, Prometheus/Grafana/OpenTelemetry wiring, evaluation/RAGAS service, OCR/Tesseract, or the local-first SQLite/node-cache stack (those remain design docs)
+- Observability: Prometheus metrics, Grafana dashboards, OpenTelemetry tracing, structured logging with Winston; evaluation/RAGAS service, OCR/Tesseract, local-first SQLite/node-cache stack remain design docs
 
 ---
 
@@ -406,8 +406,44 @@ Client → Express API → Processing Pipeline (parse → graph → summarize)
 - Caching: Redis client available and health-checked; no application-level cache currently connected
 - PDF/Extraction: `pdf-parse`, `pdfjs-dist`/`pdf2pic` helpers; table detection service exists but is not invoked in the upload flow; OCR/Tesseract not implemented
 - LLM: OpenAI + Google Gemini providers with quota manager, prompt templates, and graph-aware summarization
-- Observability: Console logger placeholder; Prometheus/Grafana/OpenTelemetry not wired up
+- Observability: Prometheus metrics, Grafana dashboards, OpenTelemetry tracing, structured logging with Winston
 - Frontend: Not included in this repository (API-first)
+
+---
+
+## 📊 Observability Setup
+
+The application includes comprehensive observability with Prometheus metrics, Grafana dashboards, and OpenTelemetry distributed tracing.
+
+### Quick Start
+
+```bash
+# Start the full observability stack
+npm run observability:full
+
+# Or start individual components
+docker-compose up -d prometheus grafana jaeger
+```
+
+### Access Points
+
+- **Prometheus**: http://localhost:9090 (metrics collection)
+- **Grafana**: http://localhost:3000 (admin/admin)
+- **Jaeger**: http://localhost:16686 (distributed tracing)
+- **Application Metrics**: http://localhost:3001/metrics (Prometheus format)
+
+### Features
+
+- **Structured Logging**: Winston-based logging with JSON output and file rotation
+- **HTTP Metrics**: Request rate, duration, status codes
+- **LLM Metrics**: Token usage, cost tracking, provider performance
+- **Business Metrics**: Documents processed, summaries generated
+- **Tracing**: Distributed tracing across PDF processing pipeline
+- **Grafana Dashboard**: Pre-configured dashboard for monitoring
+
+### Integration
+
+The observability stack is automatically initialized when the server starts. All HTTP requests are traced, and key operations (PDF processing, LLM calls, graph building) emit metrics and spans.
 
 ---
 

@@ -3,7 +3,7 @@
  * Provides structured prompts for different summarization tasks using graph data
  */
 
-import { Graph, GraphNode, NodeType } from '../../models/graph.model';
+import { Graph, GraphNode } from '../../models/graph.model';
 
 export type SummaryType =
   | 'executive' // High-level overview for executives
@@ -183,7 +183,7 @@ export class PromptTemplateService {
     // Build context string
     const contextParts: string[] = [];
 
-    for (const [sectionId, sectionNodes] of sections) {
+    for (const [, sectionNodes] of sections) {
       const sectionNode = sectionNodes[0];
       contextParts.push(`## ${sectionNode.label}\n`);
       contextParts.push(`${sectionNode.content}\n`);

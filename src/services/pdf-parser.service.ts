@@ -311,7 +311,14 @@ export class PDFParserService {
     if (str.length === 0) return undefined;
 
     // Remove null bytes and other control characters
-    return str.replace(/[\x00-\x1F\x7F-\x9F]/g, '').trim();
+    return str
+      .split('')
+      .filter((char) => {
+        const code = char.charCodeAt(0);
+        return code >= 32 && (code < 127 || code > 159);
+      })
+      .join('')
+      .trim();
   }
 
   /**

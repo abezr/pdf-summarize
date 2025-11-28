@@ -230,34 +230,27 @@ app.use('/api/*', (req, res) => {
 app.use(handleMulterError);
 
 // Global error handler
-app.use(
-  (
-    error: any,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction
-  ) => {
-    logger.error('Unhandled error', {
-      error: error.message,
-      stack: error.stack,
-      method: req.method,
-      url: req.url,
-      body: req.body,
-      params: req.params,
-      query: req.query,
-    });
+app.use((error: any, req: express.Request, res: express.Response) => {
+  logger.error('Unhandled error', {
+    error: error.message,
+    stack: error.stack,
+    method: req.method,
+    url: req.url,
+    body: req.body,
+    params: req.params,
+    query: req.query,
+  });
 
-    // Don't leak error details in production
-    const isDevelopment = config.nodeEnv === 'development';
+  // Don't leak error details in production
+  const isDevelopment = config.nodeEnv === 'development';
 
-    res.status(error.statusCode || 500).json({
-      error: error.name || 'InternalServerError',
-      message: isDevelopment ? error.message : 'An unexpected error occurred',
-      ...(isDevelopment && { stack: error.stack }),
-      timestamp: new Date().toISOString(),
-    });
-  }
-);
+  res.status(error.statusCode || 500).json({
+    error: error.name || 'InternalServerError',
+    message: isDevelopment ? error.message : 'An unexpected error occurred',
+    ...(isDevelopment && { stack: error.stack }),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Graceful shutdown
 const gracefulShutdown = async (signal: string) => {

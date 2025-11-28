@@ -9,7 +9,6 @@ import {
   ResolutionContext,
 } from './reference-resolution.service';
 import { logger } from '../../utils/logger';
-import { AppError } from '../../utils/errors';
 
 /**
  * Graph Builder: Converts PDF parsing results into knowledge graph structures

@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import {
   Graph as GraphInterface,
   GraphNode,
@@ -11,8 +10,6 @@ import {
   EdgeType,
   NODE_TYPES,
   EDGE_TYPES,
-  Position,
-  NodeMetadata,
 } from '../../models';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';

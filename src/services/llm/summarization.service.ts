@@ -117,7 +117,7 @@ export class SummarizationService {
 
       // Calculate processing statistics
       const processingTime = Date.now() - startTime;
-      const graphStats = this.calculateGraphStats(graph, promptTemplate);
+      const graphStats = this.calculateGraphStats(graph);
 
       const result: SummarizationResult = {
         summary: llmResponse.content,
@@ -202,10 +202,7 @@ export class SummarizationService {
   /**
    * Calculate statistics about the graph processing
    */
-  private calculateGraphStats(
-    graph: Graph,
-    promptTemplate: any
-  ): SummarizationResult['graphStats'] {
+  private calculateGraphStats(graph: Graph): SummarizationResult['graphStats'] {
     const sectionsFound = graph.nodes.filter(
       (n) => n.type === 'section'
     ).length;

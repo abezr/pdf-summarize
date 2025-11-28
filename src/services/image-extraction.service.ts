@@ -1,5 +1,4 @@
 import { promises as fs } from 'fs';
-import * as path from 'path';
 import { fromPath } from 'pdf2pic';
 import sharp from 'sharp';
 import { logger } from '../utils/logger';

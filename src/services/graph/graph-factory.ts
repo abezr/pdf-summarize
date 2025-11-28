@@ -4,8 +4,6 @@ import {
   GraphEdge,
   CreateNodeInput,
   CreateEdgeInput,
-  NodeType,
-  EdgeType,
   NODE_TYPES,
   EDGE_TYPES,
   Position,

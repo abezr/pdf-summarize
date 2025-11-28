@@ -14,10 +14,7 @@ import {
   ExtractedImage,
 } from '../../services/image-extraction.service';
 import { logger } from '../../utils/logger';
-import { AppError } from '../../utils/errors';
 import {
-  CreateDocumentInput,
-  UpdateDocumentInput,
   DocumentQueryParams,
   DocumentIdParams,
   SummarizationOptions,
@@ -27,23 +24,7 @@ import {
   validateRequestBody,
   validateQueryParams,
   validatePathParams,
-  ApiResponseSchema,
-  PaginatedResponseSchema,
-  DocumentStatsResponseSchema,
-  SummarizationResponseSchema,
 } from '../schemas';
-
-// Extend Express Request type to include validated data
-declare global {
-  namespace Express {
-    interface Request {
-      validatedBody?: any;
-      validatedQuery?: any;
-      validatedParams?: any;
-      user?: { id: string }; // For future authentication
-    }
-  }
-}
 
 export class DocumentController {
   /**
@@ -129,7 +110,7 @@ export class DocumentController {
     try {
       const userId = req.user?.id || (req.headers['x-user-id'] as string);
       const queryParams: DocumentQueryParams =
-        req.validatedQuery ||
+        (req.validatedQuery as DocumentQueryParams) ||
         validateQueryParams(DocumentQuerySchema, req.query);
 
       const options = {
@@ -324,7 +305,7 @@ export class DocumentController {
         req.params
       );
       const options: SummarizationOptions =
-        req.validatedBody ||
+        (req.validatedBody as SummarizationOptions) ||
         validateRequestBody(SummarizationOptionsSchema, req.body);
 
       // Verify document exists and has graph data

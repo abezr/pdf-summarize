@@ -10,8 +10,13 @@ const setStatus = (text) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function pollForCompletion(documentId, attempts = 25, delayMs = 2000) {
-  for (let i = 0; i < attempts; i++) {
+async function pollForCompletion(
+  documentId,
+  delayMs = 2000,
+  maxWaitMs = 10 * 60 * 1000 // 10 minutes
+) {
+  const start = Date.now();
+  while (true) {
     const res = await fetch(`/api/documents/${documentId}`, {
       headers: { 'x-user-id': USER_ID },
     });
@@ -22,9 +27,11 @@ async function pollForCompletion(documentId, attempts = 25, delayMs = 2000) {
     if (json?.data?.document?.status === 'failed') {
       throw new Error('Processing failed');
     }
+    if (Date.now() - start > maxWaitMs) {
+      throw new Error('Processing timed out');
+    }
     await sleep(delayMs);
   }
-  throw new Error('Processing timed out');
 }
 
 async function uploadAndSummarize(file) {

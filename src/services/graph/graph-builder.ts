@@ -188,6 +188,9 @@ export class GraphBuilder {
     tables?: ExtractedTable[],
     images?: ExtractedImage[]
   ): Promise<void> {
+    const pageContentLength = Math.max(page.content.length, 1);
+    const pageImages = images?.filter((image) => image.pageNumber === page.pageNumber) || [];
+
     // Create hierarchical containment: document → page content
     const pageContainerNode = GraphFactory.createNode({
       type: 'metadata',
@@ -196,7 +199,7 @@ export class GraphBuilder {
       position: {
         page: page.pageNumber,
         start: 0,
-        end: page.content.length,
+        end: pageContentLength,
       },
       metadata: {
         properties: {
@@ -231,7 +234,7 @@ export class GraphBuilder {
       }
     } else {
       // Fallback: create a single paragraph node from page content
-      const fallbackParagraph = this.createFallbackParagraph(page);
+      const fallbackParagraph = this.createFallbackParagraph(page, pageImages);
       if (fallbackParagraph.content.trim().length > 0) {
         graph.addNode(fallbackParagraph);
 
@@ -255,13 +258,8 @@ export class GraphBuilder {
     }
 
     // Process images on this page
-    if (images && images.length > 0) {
-      this.processImagesOnPage(
-        graph,
-        images,
-        page.pageNumber,
-        pageContainerNode.id
-      );
+    if (pageImages.length > 0) {
+      this.processImagesOnPage(graph, pageImages, page.pageNumber, pageContainerNode.id);
     }
 
     // Process text elements (simplified - could be enhanced for better structure detection)
@@ -297,15 +295,24 @@ export class GraphBuilder {
    * Create a fallback paragraph when no paragraphs are detected
    */
   private static createFallbackParagraph(
-    page: PDFParseResult['pages'][0]
+    page: PDFParseResult['pages'][0],
+    pageImages: ExtractedImage[]
   ): ReturnType<typeof GraphFactory.createParagraphNode> {
     // Split page content into reasonable paragraphs
     const lines = page.content
       .split('\n')
       .filter((line) => line.trim().length > 0);
     const content = lines.join(' ').trim();
+    const contentLength = Math.max(content.length, 1);
+    const ocrText = pageImages
+      .map((img) => img.metadata?.ocrText || '')
+      .filter((t) => t.trim().length > 0)
+      .join('\n')
+      .trim();
 
-    if (content.length === 0) {
+    const resolvedContent = content.length > 0 ? content : ocrText;
+
+    if (!resolvedContent || resolvedContent.length === 0) {
       // Create minimal placeholder
       return GraphFactory.createParagraphNode(
         '[Empty page]',
@@ -319,17 +326,18 @@ export class GraphBuilder {
     }
 
     return GraphFactory.createParagraphNode(
-      content,
+      resolvedContent,
       {
         page: page.pageNumber,
         start: 0,
-        end: content.length,
+        end: Math.max(resolvedContent.length, 1),
       },
       0.5, // Lower confidence for fallback
       {
         properties: {
           fallback: true,
           originalLines: lines.length,
+          ocrUsed: content.length === 0 && ocrText.length > 0,
         },
       }
     );

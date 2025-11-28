@@ -568,7 +568,10 @@ export class DocumentController {
           const outputDir = `./data/images/${documentId}`;
           images = await imageExtractionService.extractImages(
             filePath,
-            outputDir
+            outputDir,
+            {
+              pageCount: pdfResult.metadata.pages,
+            }
           );
           logger.info('Images extracted successfully', {
             documentId,

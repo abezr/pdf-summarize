@@ -1,9 +1,11 @@
 import { promises as fs } from 'fs';
+import path from 'path';
 import { fromPath } from 'pdf2pic';
 import sharp from 'sharp';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
 import { storageService } from './storage.service';
+import { ocrImageToText } from './ocr.service';
 
 export interface ExtractedImage {
   id: string;
@@ -23,12 +25,14 @@ export interface ExtractedImage {
     compression?: string;
     storageId?: string;
     mimeType?: string;
+    ocrText?: string;
     [key: string]: any; // Allow additional metadata
   };
 }
 
 export interface ImageExtractionOptions {
   pages?: number | number[]; // Specific pages to scan (default: all)
+  pageCount?: number; // Known page count (avoids estimation)
   format?: 'png' | 'jpeg' | 'tiff'; // Output format (default: png)
   dpi?: number; // Resolution (default: 150)
   quality?: number; // JPEG quality 1-100 (default: 90)
@@ -38,18 +42,22 @@ export interface ImageExtractionOptions {
 
 export class ImageExtractionService {
   private pdf2picOptions: any = null;
+  private ocrEnabled: boolean;
 
   constructor() {
+    this.ocrEnabled = process.env.ENABLE_OCR !== 'false';
     this.initializeLibraries();
   }
 
   private initializeLibraries() {
     try {
       // Configure pdf2pic with default options
+      const defaultTempDir = path.resolve('./temp');
+
       this.pdf2picOptions = {
         density: 150, // DPI
         saveFilename: 'page',
-        savePath: './temp',
+        savePath: defaultTempDir,
         format: 'png',
         width: 2000, // Max width
         height: 2000, // Max height
@@ -96,6 +104,11 @@ export class ImageExtractionService {
         ...this.pdf2picOptions,
       };
 
+      // Ensure temp directory for pdf2pic exists and use absolute path
+      const tempDir = path.resolve(config.savePath || './temp');
+      await fs.mkdir(tempDir, { recursive: true });
+      config.savePath = tempDir;
+
       // Validate format
       const supportedFormats = ['png', 'jpeg', 'tiff'];
       if (!supportedFormats.includes(config.format)) {
@@ -123,20 +136,25 @@ export class ImageExtractionService {
       const convert = fromPath(pdfPath, config);
 
       // Determine which pages to process
+      // Determine how many pages really exist (use provided count if given)
+      const knownPageCount =
+        typeof options.pageCount === 'number'
+          ? Math.max(1, options.pageCount)
+          : await this.getPageCount(pdfPath);
+
       let pagesToProcess: number[];
       if (pages.length > 0) {
         pagesToProcess = pages;
       } else {
         // Process all pages
-        const pageCount = await this.getPageCount(pdfPath);
-        pagesToProcess = Array.from({ length: pageCount }, (_, i) => i + 1);
+        pagesToProcess = Array.from({ length: knownPageCount }, (_, i) => i + 1);
         logger.info(
-          `ImageExtractionService: Processing all ${pageCount} pages`
+          `ImageExtractionService: Processing all ${knownPageCount} pages`
         );
       }
 
       // Validate page numbers
-      const maxPages = await this.getPageCount(pdfPath);
+      const maxPages = knownPageCount;
       const validPages = pagesToProcess.filter(
         (pageNum) => pageNum >= 1 && pageNum <= maxPages
       );
@@ -153,6 +171,8 @@ export class ImageExtractionService {
       // Process pages with progress tracking
       let processedCount = 0;
       const totalPages = validPages.length;
+      let consecutiveFailures = 0;
+      const maxConsecutiveFailures = 5; // Bail out if Ghostscript keeps failing
 
       for (const pageNum of validPages) {
         try {
@@ -178,12 +198,59 @@ export class ImageExtractionService {
               `ImageExtractionService: No result returned for page ${pageNum}`
             );
           }
+          consecutiveFailures = 0; // reset after success
         } catch (error) {
-          logger.error(
-            `ImageExtractionService: Failed to extract image from page ${pageNum}:`,
+          logger.warn(
+            `ImageExtractionService: Primary extraction failed for page ${pageNum}, retrying with lower quality`,
             error
           );
-          // Continue processing other pages
+
+          // Fallback attempt with lower density/size to reduce Ghostscript/GM failures
+          try {
+            const fallbackConfig = {
+              ...config,
+              density: Math.min(config.density || 150, 96),
+              quality: Math.min(config.quality || 90, 80),
+              width: Math.min(config.width || 2000, 1400),
+              height: Math.min(config.height || 2000, 1400),
+            };
+            const fallbackConvert = fromPath(pdfPath, fallbackConfig);
+            const fallbackResult = await fallbackConvert(pageNum);
+
+            if (fallbackResult && fallbackResult.path) {
+              const imageInfo = await this.processConvertedPage(
+                fallbackResult,
+                pageNum,
+                0,
+                outputDir,
+                fallbackConfig
+              );
+              if (imageInfo) {
+                images.push(imageInfo);
+                processedCount++;
+              }
+              consecutiveFailures = 0; // reset after success
+            } else {
+              logger.error(
+                `ImageExtractionService: Fallback did not return a result for page ${pageNum}`
+              );
+              consecutiveFailures++;
+            }
+          } catch (fallbackError) {
+            logger.error(
+              `ImageExtractionService: Fallback extraction failed for page ${pageNum}:`,
+              fallbackError
+            );
+            consecutiveFailures++;
+          }
+
+          if (consecutiveFailures >= maxConsecutiveFailures) {
+            logger.error(
+              `ImageExtractionService: Exceeded ${maxConsecutiveFailures} consecutive failures (likely Ghostscript/GM issue). Aborting remaining image extraction and continuing pipeline.`
+            );
+            break;
+          }
+          // Continue processing other pages even if fallback fails
         }
       }
 
@@ -289,6 +356,29 @@ export class ImageExtractionService {
           mimeType: storageResult.mimeType,
         },
       };
+
+      // Run OCR (if enabled) to capture text for downstream graph building/summaries
+      if (this.ocrEnabled) {
+        try {
+          const ocrText = await ocrImageToText(imageBuffer);
+          if (ocrText) {
+            extractedImage.metadata = extractedImage.metadata || {};
+            extractedImage.metadata.ocrText = ocrText;
+          }
+        } catch (ocrError) {
+          logger.warn(
+            'ImageExtractionService: OCR extraction failed for image:',
+            ocrError
+          );
+          // If tesseract is missing, disable further OCR attempts to avoid crashing
+          if ((ocrError as any)?.code === 'ENOENT') {
+            this.ocrEnabled = false;
+            logger.warn(
+              'ImageExtractionService: Disabling OCR because tesseract binary was not found. Install tesseract or set ENABLE_OCR=false.'
+            );
+          }
+        }
+      }
 
       logger.debug(
         `ImageExtractionService: Created image ${extractedImage.id} (${extractedImage.width}x${extractedImage.height}, ${extractedImage.size} bytes)`

@@ -67,6 +67,16 @@ export class SummarizationService {
         throw new AppError('Graph has no nodes to summarize', 400);
       }
 
+      // Quick guard: if there are no meaningful text nodes, return a descriptive message
+      const textNodes = graph.nodes.filter((n) =>
+        ['section', 'paragraph', 'heading', 'list', 'code', 'table'].includes(
+          n.type
+        )
+      );
+      const hasMeaningfulText = textNodes.some(
+        (n) => n.content && n.content.trim().length > 30
+      );
+
       // Set defaults
       const summaryType = options.type || 'executive';
       const maxLength = options.maxLength || 500;
@@ -80,9 +90,16 @@ export class SummarizationService {
       );
 
       // Generate prompt using template service with MCP tools
+      const reducedContext = this.buildReducedContext(graph, {
+        maxChars: 10000,
+        minParagraphLength: 40,
+        maxParagraphs: 60,
+      });
+
       const promptRequest: SummaryRequest = {
         type: summaryType,
         graph,
+        contextOverride: reducedContext,
         maxLength,
         focus: options.focus,
         exclude: options.exclude,
@@ -92,6 +109,9 @@ export class SummarizationService {
 
       const promptTemplate =
         promptTemplateService.generatePrompt(promptRequest);
+
+      const contextIsEmpty =
+        !promptTemplate.context || promptTemplate.context.trim().length === 0;
 
       // Estimate tokens for cost planning
       const estimatedPromptTokens = promptTemplateService.estimateTokenCount(
@@ -103,6 +123,32 @@ export class SummarizationService {
         estimatedPromptTokens,
         contextLength: promptTemplate.context.length,
       });
+
+      // If there's no textual context, short-circuit with a descriptive summary
+      if (contextIsEmpty || !hasMeaningfulText) {
+        const processingTime = Date.now() - startTime;
+        const graphStats = this.calculateGraphStats(graph);
+        const imageCount = graph.nodes.filter((n) => n.type === 'image').length;
+        const pageLikeCount = graph.nodes.filter(
+          (n) => n.type === 'metadata' && n.label?.startsWith('Page')
+        ).length;
+
+        const summaryText =
+          'No usable text was extracted from this document, so an executive summary cannot reference source text. ' +
+          `The graph contains ${imageCount} image node${imageCount === 1 ? '' : 's'} across ${pageLikeCount || 'multiple'} page node${pageLikeCount === 1 ? '' : 's'}. ` +
+          'This build does not perform OCR/vision summarization. Please provide a text-based PDF or enable OCR to generate a meaningful summary.';
+
+        return {
+          summary: summaryText,
+          type: summaryType,
+          model: 'n/a',
+          provider: 'none',
+          tokensUsed: { prompt: 0, completion: 0, total: 0 },
+          cost: 0,
+          processingTime,
+          graphStats,
+        };
+      }
 
       // Prepare LLM request with function calling enabled
       const llmRequest = {
@@ -138,6 +184,22 @@ export class SummarizationService {
 
         // Execute tool calls and continue conversation
         llmResponse = await this.handleToolCalls(llmResponse, mcpContext, options);
+      }
+
+      // Fallback if LLM returned empty content
+      if (!llmResponse.content || llmResponse.content.trim().length === 0) {
+        logger.warn('LLM returned empty summary content; using fallback summary');
+        llmResponse = {
+          ...llmResponse,
+          content: this.buildFallbackSummary(
+            reducedContext || promptTemplate.context,
+            1200
+          ),
+          provider: llmResponse.provider || 'fallback',
+          model: llmResponse.model || 'deterministic-fallback',
+          tokensUsed: llmResponse.tokensUsed || { prompt: 0, completion: 0, total: 0 },
+          cost: llmResponse.cost || 0,
+        };
       }
 
       // Calculate processing statistics
@@ -280,6 +342,82 @@ export class SummarizationService {
       sectionsFound,
       totalContentLength,
     };
+  }
+
+  /**
+   * Build a reduced, cleaned context string from graph text nodes to keep prompts small and coherent
+   */
+  private buildReducedContext(
+    graph: Graph,
+    opts: { maxChars: number; minParagraphLength: number; maxParagraphs: number }
+  ): string {
+    const paragraphs = graph.nodes
+      .filter((n) => n.type === 'paragraph')
+      .map((n) => {
+        const text = (n.content || '').replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g, ' ');
+        const cleaned = text.replace(/\s+/g, ' ').trim();
+        const letters = (cleaned.match(/[A-Za-z\u0400-\u04FF]/g) || []).length;
+        const digits = (cleaned.match(/\d/g) || []).length;
+        const lettersRatio = cleaned.length > 0 ? letters / cleaned.length : 0;
+        const confidence = typeof (n as any).metadata?.confidence === 'number'
+          ? (n as any).metadata.confidence
+          : 0.5;
+        return {
+          node: n,
+          cleaned,
+          lettersRatio,
+          digits,
+          confidence,
+        };
+      })
+      .filter(
+        (p) =>
+          p.cleaned.length >= opts.minParagraphLength &&
+          p.lettersRatio >= 0.5 &&
+          !/^page_\d+_image_/i.test(p.cleaned) &&
+          !p.cleaned.startsWith('www')
+      )
+      .sort((a, b) => {
+        if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+        if (a.node.position.page !== b.node.position.page) {
+          return a.node.position.page - b.node.position.page;
+        }
+        return (a.node.position.start || 0) - (b.node.position.start || 0);
+      });
+
+    const selected: string[] = [];
+    let charBudget = opts.maxChars;
+
+    for (const para of paragraphs) {
+      if (selected.length >= opts.maxParagraphs) break;
+      if (para.cleaned.length > charBudget) continue;
+      selected.push(para.cleaned);
+      charBudget -= para.cleaned.length + 2; // account for spacing
+      if (charBudget <= 0) break;
+    }
+
+    return selected.join('\n\n');
+  }
+
+  /**
+   * Deterministic fallback summary if LLM returns empty content
+   */
+  private buildFallbackSummary(context: string, maxChars: number): string {
+    if (!context || context.trim().length === 0) {
+      return 'Summary unavailable: no usable text content was extracted.';
+    }
+    const cleaned = context
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\u00A0-\uFFFF]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, maxChars);
+
+    const sentences = cleaned.split(/[.!?]+/).map((s) => s.trim()).filter((s) => s.length > 0);
+    const top = sentences.slice(0, 5);
+    if (top.length === 0) {
+      return 'Summary unavailable: extracted text could not be cleaned into sentences.';
+    }
+    return `Fallback summary: ${top.join('. ')}.`;
   }
 
   /**

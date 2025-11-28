@@ -16,6 +16,7 @@ export type SummaryType =
 export interface SummaryRequest {
   type: SummaryType;
   graph: Graph;
+  contextOverride?: string; // Optional precomputed context string
   maxLength?: number; // Maximum length in words
   focus?: string[]; // Specific topics to focus on
   exclude?: string[]; // Topics to exclude
@@ -37,6 +38,7 @@ export class PromptTemplateService {
     const {
       type,
       graph,
+      contextOverride,
       maxLength,
       focus,
       exclude,
@@ -47,7 +49,10 @@ export class PromptTemplateService {
     const summaryNodes = this.getRelevantNodes(graph, type);
 
     // Generate context from graph
-    const context = this.generateContext(graph, summaryNodes);
+    const context =
+      contextOverride !== undefined
+        ? contextOverride
+        : this.generateContext(graph, summaryNodes);
 
     // Generate type-specific prompt
     const template = this.getTemplateForType(type, style);

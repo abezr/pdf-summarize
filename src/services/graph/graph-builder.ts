@@ -3,6 +3,8 @@ import { GraphFactory } from './graph-factory';
 import { PDFParseResult, PDFParagraph } from '../pdf-parser.service';
 import { ExtractedTable } from '../table-detection.service';
 import { ExtractedImage } from '../image-extraction.service';
+import { ReferenceDetectionService } from './reference-detection.service';
+import { ReferenceResolutionService, ResolutionContext } from './reference-resolution.service';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 
@@ -97,6 +99,9 @@ export class GraphBuilder {
 
     // 5. Detect and create section hierarchy
     this.createSectionHierarchy(graph);
+
+    // 6. Detect and create reference edges
+    await this.detectAndCreateReferenceEdges(graph);
   }
 
   /**
@@ -524,6 +529,96 @@ export class GraphBuilder {
       0.8, // Default confidence
       metadata
     );
+  }
+
+  /**
+   * Detect references in text nodes and create reference edges
+   */
+  private static async detectAndCreateReferenceEdges(graph: Graph): Promise<void> {
+    logger.info('Starting reference detection and edge creation');
+
+    const startTime = Date.now();
+    let totalReferencesDetected = 0;
+    let totalEdgesCreated = 0;
+
+    // Get all text nodes that might contain references
+    const textNodes = graph.getNodesByType('paragraph')
+      .concat(graph.getNodesByType('section'))
+      .concat(graph.getNodesByType('metadata'));
+
+    logger.debug(`Analyzing ${textNodes.length} text nodes for references`);
+
+    // Analyze each text node for references
+    for (const sourceNode of textNodes) {
+      try {
+        // Detect references in this node
+        const analysis = await ReferenceDetectionService.analyzeNode(sourceNode);
+
+        if (analysis.references.length === 0) {
+          continue; // No references found
+        }
+
+        totalReferencesDetected += analysis.references.length;
+
+        logger.debug(`Found ${analysis.references.length} references in node ${sourceNode.id}`);
+
+        // Create resolution context
+        const context: ResolutionContext = {
+          graph,
+          sourceNode,
+          context: {
+            documentStructure: {
+              totalPages: graph.nodes.reduce((max, node) => Math.max(max, node.position.page), 0),
+              sections: graph.getNodesByType('section'),
+              figures: graph.getNodesByType('image'),
+              tables: graph.getNodesByType('table')
+            }
+          }
+        };
+
+        // Resolve each reference
+        const resolutions = await ReferenceResolutionService.resolveReferences(
+          analysis.references,
+          context
+        );
+
+        // Create edges for successful resolutions
+        for (const resolution of resolutions) {
+          if (resolution.targetNode && resolution.confidence > 0.4) { // Minimum confidence threshold
+            const referenceEdge = GraphFactory.createReferencesEdge(
+              sourceNode.id,
+              resolution.targetNode.id,
+              resolution.confidence,
+              `Reference: ${resolution.reference.text} (${resolution.reason})`
+            );
+
+            graph.addEdge(referenceEdge);
+            totalEdgesCreated++;
+
+            logger.debug(`Created reference edge: ${sourceNode.id} -> ${resolution.targetNode.id}`, {
+              reference: resolution.reference.text,
+              confidence: resolution.confidence,
+              reason: resolution.reason
+            });
+          } else {
+            logger.debug(`Reference not resolved: ${resolution.reference.text}`, {
+              confidence: resolution.confidence,
+              reason: resolution.reason
+            });
+          }
+        }
+
+      } catch (error) {
+        logger.warn(`Failed to process references for node ${sourceNode.id}:`, error);
+      }
+    }
+
+    const processingTime = Date.now() - startTime;
+    logger.info('Reference detection and edge creation completed', {
+      totalReferencesDetected,
+      totalEdgesCreated,
+      processingTimeMs: processingTime
+    });
   }
 
   /**

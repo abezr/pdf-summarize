@@ -34,7 +34,7 @@ export class Graph implements GraphInterface {
    * Create a new graph instance
    */
   constructor(documentId: string, id?: string) {
-    this.id = id || uuidv4();
+    this.id = id || documentId;
     this.documentId = documentId;
     this.nodes = [];
     this.edges = [];

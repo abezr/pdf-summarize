@@ -366,7 +366,7 @@ export class TokenManager {
   public clearOldRecords(hours: number = 168): void { // 7 days default
     const cutoff = new Date(Date.now() - (hours * 60 * 60 * 1000));
     const beforeCount = this.usageRecords.length;
-    this.usageRecords = this.usageRecords.filter(r => r.timestamp >= cutoff);
+    this.usageRecords = this.usageRecords.filter(r => r.timestamp > cutoff);
     const afterCount = this.usageRecords.length;
 
     logger.info('Cleared old usage records', {

@@ -1,5 +1,11 @@
 import dotenv from 'dotenv';
 
+// Mock uuid module to avoid ES module issues with Jest
+let uuidCounter = 0;
+jest.mock('uuid', () => ({
+  v4: jest.fn(() => `mock-uuid-${uuidCounter++}`),
+}));
+
 // Load test environment variables
 dotenv.config({ path: '.env.test' });
 

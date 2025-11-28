@@ -33,7 +33,8 @@ export interface ExtractedTable {
 
 export interface TableDetectionOptions {
   pages?: number | number[]; // Specific pages to scan (default: all)
-  area?: { // Specific area to scan (x1,y1,x2,y2)
+  area?: {
+    // Specific area to scan (x1,y1,x2,y2)
     x1: number;
     y1: number;
     x2: number;
@@ -57,7 +58,10 @@ export class TableDetectionService {
       this.tabula = require('@krakz999/tabula-node');
       logger.info('TableDetectionService: Initialized @krakz999/tabula-node');
     } catch (error) {
-      logger.warn('TableDetectionService: Failed to load @krakz999/tabula-node:', error);
+      logger.warn(
+        'TableDetectionService: Failed to load @krakz999/tabula-node:',
+        error
+      );
     }
 
     try {
@@ -65,12 +69,21 @@ export class TableDetectionService {
       this.pdfTableExtractor = require('pdf-table-extractor');
       logger.info('TableDetectionService: Initialized pdf-table-extractor');
     } catch (error) {
-      logger.warn('TableDetectionService: Failed to load pdf-table-extractor:', error);
+      logger.warn(
+        'TableDetectionService: Failed to load pdf-table-extractor:',
+        error
+      );
     }
 
     if (!this.tabula && !this.pdfTableExtractor) {
-      logger.error('TableDetectionService: No table detection libraries available');
-      throw new AppError('No table detection libraries available', 500, 'TABLE_DETECTION_UNAVAILABLE');
+      logger.error(
+        'TableDetectionService: No table detection libraries available'
+      );
+      throw new AppError(
+        'No table detection libraries available',
+        500,
+        'TABLE_DETECTION_UNAVAILABLE'
+      );
     }
   }
 
@@ -94,28 +107,42 @@ export class TableDetectionService {
         try {
           const tabulaTables = await this.extractWithTabula(pdfPath, options);
           tables.push(...tabulaTables);
-          logger.info(`TableDetectionService: Extracted ${tabulaTables.length} tables with tabula`);
+          logger.info(
+            `TableDetectionService: Extracted ${tabulaTables.length} tables with tabula`
+          );
         } catch (error) {
-          logger.warn('TableDetectionService: Tabula extraction failed, trying fallback:', error);
+          logger.warn(
+            'TableDetectionService: Tabula extraction failed, trying fallback:',
+            error
+          );
         }
       }
 
       // If no tables found or tabula failed, try fallback
       if (tables.length === 0 && this.pdfTableExtractor) {
         try {
-          const fallbackTables = await this.extractWithPdfTableExtractor(pdfPath, options);
+          const fallbackTables = await this.extractWithPdfTableExtractor(
+            pdfPath,
+            options
+          );
           tables.push(...fallbackTables);
-          logger.info(`TableDetectionService: Extracted ${fallbackTables.length} tables with pdf-table-extractor`);
+          logger.info(
+            `TableDetectionService: Extracted ${fallbackTables.length} tables with pdf-table-extractor`
+          );
         } catch (error) {
-          logger.warn('TableDetectionService: Fallback extraction failed:', error);
+          logger.warn(
+            'TableDetectionService: Fallback extraction failed:',
+            error
+          );
         }
       }
 
       const duration = Date.now() - startTime;
-      logger.info(`TableDetectionService: Extracted ${tables.length} tables in ${duration}ms`);
+      logger.info(
+        `TableDetectionService: Extracted ${tables.length} tables in ${duration}ms`
+      );
 
       return tables;
-
     } catch (error) {
       logger.error('TableDetectionService: Table extraction failed:', error);
       throw new AppError(
@@ -136,7 +163,11 @@ export class TableDetectionService {
     const { extractTables } = this.tabula;
 
     const tabulaOptions: any = {
-      pages: options.pages ? (Array.isArray(options.pages) ? options.pages.join(',') : options.pages.toString()) : 'all',
+      pages: options.pages
+        ? Array.isArray(options.pages)
+          ? options.pages.join(',')
+          : options.pages.toString()
+        : 'all',
       format: 'JSON', // Get structured data for easier parsing
       guess: true, // Auto-detect table areas
     };
@@ -178,7 +209,10 @@ export class TableDetectionService {
   /**
    * Parse tabula JSON output into ExtractedTable format
    */
-  private parseTabulaTable(rawTable: any, tableIndex: number): ExtractedTable | null {
+  private parseTabulaTable(
+    rawTable: any,
+    tableIndex: number
+  ): ExtractedTable | null {
     try {
       // Tabula JSON structure varies, but typically contains:
       // - page: page number
@@ -198,21 +232,21 @@ export class TableDetectionService {
           text: String(cell || '').trim(),
           row: rowIndex,
           col: colIndex,
-          confidence: 0.9 // Tabula doesn't provide confidence, assume high
+          confidence: 0.9, // Tabula doesn't provide confidence, assume high
         }));
       });
 
       // Extract headers (first row if it looks like headers)
       let headers: string[] | undefined;
       if (rows.length > 1 && this.isHeaderRow(rows[0])) {
-        headers = rows[0].map(cell => cell.text);
+        headers = rows[0].map((cell) => cell.text);
         rows.shift(); // Remove header row from data
       }
 
       const tableData: TableData = {
         headers,
-        rows: rows.map(row => row.map(cell => cell.text)), // Convert back to string[][] for TableData
-        rawText: this.tableToText(rows, headers)
+        rows: rows.map((row) => row.map((cell) => cell.text)), // Convert back to string[][] for TableData
+        rawText: this.tableToText(rows, headers),
       };
 
       return {
@@ -222,11 +256,13 @@ export class TableDetectionService {
         data: tableData,
         confidence: 0.85, // Good confidence for tabula
         method: 'tabula',
-        bbox: rawTable.bbox // If available
+        bbox: rawTable.bbox, // If available
       };
-
     } catch (error) {
-      logger.warn('TableDetectionService: Failed to parse tabula table:', error);
+      logger.warn(
+        'TableDetectionService: Failed to parse tabula table:',
+        error
+      );
       return null;
     }
   }
@@ -237,10 +273,9 @@ export class TableDetectionService {
   private isHeaderRow(row: TableCell[]): boolean {
     if (row.length === 0) return false;
 
-    const textCells = row.filter(cell =>
-      cell.text &&
-      cell.text.trim().length > 0 &&
-      isNaN(Number(cell.text)) // Not a number
+    const textCells = row.filter(
+      (cell) =>
+        cell.text && cell.text.trim().length > 0 && isNaN(Number(cell.text)) // Not a number
     );
 
     // If more than 70% of cells are non-numeric text, consider it a header
@@ -258,8 +293,8 @@ export class TableDetectionService {
       text += '-'.repeat(headers.join(' | ').length) + '\n';
     }
 
-    rows.forEach(row => {
-      text += row.map(cell => cell.text).join(' | ') + '\n';
+    rows.forEach((row) => {
+      text += row.map((cell) => cell.text).join(' | ') + '\n';
     });
 
     return text.trim();
@@ -276,7 +311,8 @@ export class TableDetectionService {
 
     // pdf-table-extractor uses callbacks, wrap in Promise
     const result = await new Promise<any>((resolve, reject) => {
-      this.pdfTableExtractor(pdfPath,
+      this.pdfTableExtractor(
+        pdfPath,
         (result: any) => resolve(result),
         (error: any) => reject(error)
       );
@@ -289,19 +325,27 @@ export class TableDetectionService {
 
         // Check if we should process this page
         if (options.pages) {
-          const targetPages = Array.isArray(options.pages) ? options.pages : [options.pages];
+          const targetPages = Array.isArray(options.pages)
+            ? options.pages
+            : [options.pages];
           if (!targetPages.includes(pageNumber)) {
             return; // Skip this page
           }
         }
 
         if (pageData.tables && Array.isArray(pageData.tables)) {
-          pageData.tables.forEach((tableData: string[][], tableIndex: number) => {
-            const extractedTable = this.parsePdfTableExtractorTable(tableData, pageNumber, tableIndex);
-            if (extractedTable) {
-              tables.push(extractedTable);
+          pageData.tables.forEach(
+            (tableData: string[][], tableIndex: number) => {
+              const extractedTable = this.parsePdfTableExtractorTable(
+                tableData,
+                pageNumber,
+                tableIndex
+              );
+              if (extractedTable) {
+                tables.push(extractedTable);
+              }
             }
-          });
+          );
         }
       });
     }
@@ -323,26 +367,28 @@ export class TableDetectionService {
       }
 
       // Convert to our TableCell format
-      const rows: TableCell[][] = tableData.map((row: string[], rowIndex: number) => {
-        return row.map((cell: string, colIndex: number) => ({
-          text: String(cell || '').trim(),
-          row: rowIndex,
-          col: colIndex,
-          confidence: 0.7 // Lower confidence for fallback method
-        }));
-      });
+      const rows: TableCell[][] = tableData.map(
+        (row: string[], rowIndex: number) => {
+          return row.map((cell: string, colIndex: number) => ({
+            text: String(cell || '').trim(),
+            row: rowIndex,
+            col: colIndex,
+            confidence: 0.7, // Lower confidence for fallback method
+          }));
+        }
+      );
 
       // Extract headers (first row if it looks like headers)
       let headers: string[] | undefined;
       if (rows.length > 1 && this.isHeaderRow(rows[0])) {
-        headers = rows[0].map(cell => cell.text);
+        headers = rows[0].map((cell) => cell.text);
         rows.shift(); // Remove header row from data
       }
 
       const processedTableData: TableData = {
         headers,
-        rows: rows.map(row => row.map(cell => cell.text)), // Convert back to string[][]
-        rawText: this.tableToText(rows, headers)
+        rows: rows.map((row) => row.map((cell) => cell.text)), // Convert back to string[][]
+        rawText: this.tableToText(rows, headers),
       };
 
       return {
@@ -351,11 +397,13 @@ export class TableDetectionService {
         tableNumber: tableIndex,
         data: processedTableData,
         confidence: 0.6, // Lower confidence for fallback method
-        method: 'pdf-table-extractor'
+        method: 'pdf-table-extractor',
       };
-
     } catch (error) {
-      logger.warn('TableDetectionService: Failed to parse pdf-table-extractor table:', error);
+      logger.warn(
+        'TableDetectionService: Failed to parse pdf-table-extractor table:',
+        error
+      );
       return null;
     }
   }
@@ -371,7 +419,11 @@ export class TableDetectionService {
     }
 
     if (!pdfPath.toLowerCase().endsWith('.pdf')) {
-      throw new AppError('File does not have .pdf extension', 400, 'INVALID_FILE_TYPE');
+      throw new AppError(
+        'File does not have .pdf extension',
+        400,
+        'INVALID_FILE_TYPE'
+      );
     }
 
     // Could add more validation here (file size, PDF header check, etc.)
@@ -384,7 +436,7 @@ export class TableDetectionService {
     return {
       tabulaAvailable: !!this.tabula,
       pdfTableExtractorAvailable: !!this.pdfTableExtractor,
-      overallHealthy: !!(this.tabula || this.pdfTableExtractor)
+      overallHealthy: !!(this.tabula || this.pdfTableExtractor),
     };
   }
 }

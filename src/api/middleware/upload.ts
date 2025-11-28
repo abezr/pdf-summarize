@@ -28,12 +28,12 @@ const createDiskStorage = (destination: string): StorageEngine => {
     },
     filename: (req, file, cb) => {
       // Generate unique filename with timestamp and random suffix
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
       const extension = path.extname(file.originalname).toLowerCase();
       const basename = path.basename(file.originalname, extension);
       const filename = `${basename}-${uniqueSuffix}${extension}`;
       cb(null, filename);
-    }
+    },
   });
 };
 
@@ -44,10 +44,7 @@ export const pdfFileFilter = (
   cb: multer.FileFilterCallback
 ): void => {
   // Check MIME type
-  const allowedMimes = [
-    'application/pdf',
-    'application/x-pdf'
-  ];
+  const allowedMimes = ['application/pdf', 'application/x-pdf'];
 
   if (allowedMimes.includes(file.mimetype)) {
     cb(null, true);
@@ -68,7 +65,7 @@ export const imageFileFilter = (
     'image/png',
     'image/webp',
     'image/tiff',
-    'image/bmp'
+    'image/bmp',
   ];
 
   if (allowedMimes.includes(file.mimetype)) {
@@ -79,10 +76,21 @@ export const imageFileFilter = (
 };
 
 // General file validation middleware
-export const validateFileSize = (maxSize: number = config.upload.maxFileSize) => {
-  return (req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
+export const validateFileSize = (
+  maxSize: number = config.upload.maxFileSize
+) => {
+  return (
+    req: Request,
+    file: Express.Multer.File,
+    cb: multer.FileFilterCallback
+  ) => {
     if (file.size > maxSize) {
-      cb(new AppError(`File size exceeds ${maxSize / (1024 * 1024)}MB limit`, 400));
+      cb(
+        new AppError(
+          `File size exceeds ${maxSize / (1024 * 1024)}MB limit`,
+          400
+        )
+      );
       return;
     }
     cb(null, true);
@@ -95,8 +103,8 @@ export const uploadSinglePDF = multer({
   fileFilter: pdfFileFilter,
   limits: {
     fileSize: config.upload.maxFileSize,
-    files: 1
-  }
+    files: 1,
+  },
 }).single('pdf');
 
 export const uploadMultiplePDFs = multer({
@@ -104,8 +112,8 @@ export const uploadMultiplePDFs = multer({
   fileFilter: pdfFileFilter,
   limits: {
     fileSize: config.upload.maxFileSize,
-    files: 10 // Allow up to 10 files
-  }
+    files: 10, // Allow up to 10 files
+  },
 }).array('pdfs', 10);
 
 export const uploadPDFToMemory = multer({
@@ -113,8 +121,8 @@ export const uploadPDFToMemory = multer({
   fileFilter: pdfFileFilter,
   limits: {
     fileSize: config.upload.maxFileSize,
-    files: 1
-  }
+    files: 1,
+  },
 }).single('pdf');
 
 export const uploadImageToMemory = multer({
@@ -122,8 +130,8 @@ export const uploadImageToMemory = multer({
   fileFilter: imageFileFilter,
   limits: {
     fileSize: config.upload.maxFileSize,
-    files: 1
-  }
+    files: 1,
+  },
 }).single('image');
 
 // Error handling middleware for multer
@@ -152,7 +160,7 @@ export const handleMulterError = (
     res.status(400).json({
       error: 'UploadError',
       message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
     return;
   }
@@ -169,7 +177,7 @@ export const cleanupTempFile = async (filePath: string): Promise<void> => {
   } catch (error) {
     logger.error('Failed to cleanup temporary file', {
       filePath,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message : String(error),
     });
   }
 };

@@ -9,7 +9,7 @@ import {
   NODE_TYPES,
   EDGE_TYPES,
   Position,
-  NodeMetadata
+  NodeMetadata,
 } from '../../models';
 
 /**
@@ -31,7 +31,7 @@ export class GraphFactory {
       position: input.position,
       metadata: input.metadata || {},
       created_at: now,
-      updated_at: now
+      updated_at: now,
     };
 
     return node;
@@ -51,7 +51,7 @@ export class GraphFactory {
       type: input.type,
       weight: input.weight ?? 1.0,
       metadata: input.metadata || {},
-      created_at: now
+      created_at: now,
     };
 
     return edge;
@@ -76,17 +76,17 @@ export class GraphFactory {
       position: {
         page: 1,
         start: 0,
-        end: validFileSize // Use file size as content length approximation
+        end: validFileSize, // Use file size as content length approximation
       },
       metadata: {
         confidence: 1.0,
         properties: {
           totalPages,
           fileSize,
-          filename
+          filename,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -109,10 +109,10 @@ export class GraphFactory {
         confidence,
         properties: {
           level,
-          headingLevel: level
+          headingLevel: level,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -144,8 +144,8 @@ export class GraphFactory {
       position,
       metadata: {
         confidence,
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -170,10 +170,10 @@ export class GraphFactory {
         properties: {
           rowCount,
           colCount,
-          cellCount: rowCount * colCount
+          cellCount: rowCount * colCount,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -196,10 +196,10 @@ export class GraphFactory {
         confidence,
         properties: {
           dimensions,
-          hasAltText: !!altText
+          hasAltText: !!altText,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -223,10 +223,10 @@ export class GraphFactory {
         confidence,
         properties: {
           itemCount,
-          listType
+          listType,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -240,9 +240,7 @@ export class GraphFactory {
     confidence: number = 0.9,
     metadata?: NodeMetadata
   ): GraphNode {
-    const label = language
-      ? `Code: ${language}`
-      : 'Code Block';
+    const label = language ? `Code: ${language}` : 'Code Block';
 
     return this.createNode({
       type: 'code',
@@ -253,10 +251,10 @@ export class GraphFactory {
         confidence,
         properties: {
           language,
-          lineCount: content.split('\n').length
+          lineCount: content.split('\n').length,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -282,10 +280,10 @@ export class GraphFactory {
         properties: {
           key,
           value,
-          valueType: typeof value
+          valueType: typeof value,
         },
-        ...metadata
-      }
+        ...metadata,
+      },
     });
   }
 
@@ -301,7 +299,7 @@ export class GraphFactory {
       source: parentId,
       target: childId,
       type: 'contains',
-      weight
+      weight,
     });
   }
 
@@ -317,7 +315,7 @@ export class GraphFactory {
       source: predecessorId,
       target: successorId,
       type: 'follows',
-      weight
+      weight,
     });
   }
 
@@ -336,8 +334,8 @@ export class GraphFactory {
       type: 'references',
       weight,
       metadata: {
-        context
-      }
+        context,
+      },
     });
   }
 
@@ -357,8 +355,8 @@ export class GraphFactory {
       weight: similarity,
       metadata: {
         context,
-        similarityScore: similarity
-      }
+        similarityScore: similarity,
+      },
     });
   }
 
@@ -378,7 +376,11 @@ export class GraphFactory {
       throw new Error('Node content cannot be null or undefined');
     }
 
-    if (!input.position || typeof input.position.page !== 'number' || input.position.page < 1) {
+    if (
+      !input.position ||
+      typeof input.position.page !== 'number' ||
+      input.position.page < 1
+    ) {
       throw new Error('Invalid position: page must be a positive number');
     }
 
@@ -386,12 +388,17 @@ export class GraphFactory {
       throw new Error('Invalid position: start must be a non-negative number');
     }
 
-    if (typeof input.position.end !== 'number' || input.position.end <= input.position.start) {
+    if (
+      typeof input.position.end !== 'number' ||
+      input.position.end <= input.position.start
+    ) {
       throw new Error('Invalid position: end must be greater than start');
     }
 
-    if (input.metadata?.confidence !== undefined &&
-        (input.metadata.confidence < 0 || input.metadata.confidence > 1)) {
+    if (
+      input.metadata?.confidence !== undefined &&
+      (input.metadata.confidence < 0 || input.metadata.confidence > 1)
+    ) {
       throw new Error('Invalid confidence: must be between 0 and 1');
     }
   }
@@ -409,7 +416,9 @@ export class GraphFactory {
     }
 
     if (input.source === input.target) {
-      throw new Error('Edge cannot reference the same node (no self-references allowed)');
+      throw new Error(
+        'Edge cannot reference the same node (no self-references allowed)'
+      );
     }
 
     if (!input.type || !EDGE_TYPES.includes(input.type)) {

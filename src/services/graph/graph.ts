@@ -12,7 +12,7 @@ import {
   NODE_TYPES,
   EDGE_TYPES,
   Position,
-  NodeMetadata
+  NodeMetadata,
 } from '../../models';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
@@ -46,7 +46,7 @@ export class Graph implements GraphInterface {
       byKeyword: new Map(),
       nodeMap: new Map(),
       edgeMap: new Map(),
-      adjacencyList: new Map()
+      adjacencyList: new Map(),
     };
 
     // Initialize empty statistics
@@ -58,7 +58,7 @@ export class Graph implements GraphInterface {
       averageDegree: 0,
       maxDegree: 0,
       density: 0,
-      components: 0
+      components: 0,
     };
 
     // Initialize metadata
@@ -68,15 +68,15 @@ export class Graph implements GraphInterface {
       version: '1.0',
       status: 'building',
       processingTime: undefined,
-      error: undefined
+      error: undefined,
     };
 
     // Initialize index maps
-    NODE_TYPES.forEach(type => {
+    NODE_TYPES.forEach((type) => {
       this.index.byType.set(type, []);
       this.statistics.nodesByType[type] = 0;
     });
-    EDGE_TYPES.forEach(type => {
+    EDGE_TYPES.forEach((type) => {
       this.statistics.edgesByType[type] = 0;
     });
   }
@@ -106,7 +106,7 @@ export class Graph implements GraphInterface {
 
     // Update keyword index (extract keywords from content)
     const keywords = this.extractKeywords(node.content);
-    keywords.forEach(keyword => {
+    keywords.forEach((keyword) => {
       const keywordNodes = this.index.byKeyword.get(keyword) || [];
       keywordNodes.push(node.id);
       this.index.byKeyword.set(keyword, keywordNodes);
@@ -126,7 +126,7 @@ export class Graph implements GraphInterface {
    * Remove a node from the graph
    */
   removeNode(nodeId: string): boolean {
-    const nodeIndex = this.nodes.findIndex(n => n.id === nodeId);
+    const nodeIndex = this.nodes.findIndex((n) => n.id === nodeId);
     if (nodeIndex === -1) {
       return false;
     }
@@ -153,7 +153,7 @@ export class Graph implements GraphInterface {
 
     // Remove from keyword index
     const keywords = this.extractKeywords(node.content);
-    keywords.forEach(keyword => {
+    keywords.forEach((keyword) => {
       const keywordNodes = this.index.byKeyword.get(keyword) || [];
       const keywordIndex = keywordNodes.indexOf(nodeId);
       if (keywordIndex !== -1) {
@@ -162,8 +162,10 @@ export class Graph implements GraphInterface {
     });
 
     // Remove connected edges
-    const connectedEdges = this.edges.filter(e => e.source === nodeId || e.target === nodeId);
-    connectedEdges.forEach(edge => this.removeEdge(edge.id));
+    const connectedEdges = this.edges.filter(
+      (e) => e.source === nodeId || e.target === nodeId
+    );
+    connectedEdges.forEach((edge) => this.removeEdge(edge.id));
 
     // Remove from adjacency list
     this.index.adjacencyList.delete(nodeId);
@@ -214,7 +216,7 @@ export class Graph implements GraphInterface {
    * Remove an edge from the graph
    */
   removeEdge(edgeId: string): boolean {
-    const edgeIndex = this.edges.findIndex(e => e.id === edgeId);
+    const edgeIndex = this.edges.findIndex((e) => e.id === edgeId);
     if (edgeIndex === -1) {
       return false;
     }
@@ -260,7 +262,7 @@ export class Graph implements GraphInterface {
    */
   getNodesByType(type: NodeType): GraphNode[] {
     const nodeIds = this.index.byType.get(type) || [];
-    return nodeIds.map(id => this.index.nodeMap.get(id)!).filter(Boolean);
+    return nodeIds.map((id) => this.index.nodeMap.get(id)!).filter(Boolean);
   }
 
   /**
@@ -268,7 +270,7 @@ export class Graph implements GraphInterface {
    */
   getNodesByPage(page: number): GraphNode[] {
     const nodeIds = this.index.byPage.get(page) || [];
-    return nodeIds.map(id => this.index.nodeMap.get(id)!).filter(Boolean);
+    return nodeIds.map((id) => this.index.nodeMap.get(id)!).filter(Boolean);
   }
 
   /**
@@ -276,7 +278,7 @@ export class Graph implements GraphInterface {
    */
   getNodesByKeyword(keyword: string): GraphNode[] {
     const nodeIds = this.index.byKeyword.get(keyword.toLowerCase()) || [];
-    return nodeIds.map(id => this.index.nodeMap.get(id)!).filter(Boolean);
+    return nodeIds.map((id) => this.index.nodeMap.get(id)!).filter(Boolean);
   }
 
   /**
@@ -288,22 +290,25 @@ export class Graph implements GraphInterface {
 
     // Count nodes by type
     const nodesByType = {} as Record<NodeType, number>;
-    NODE_TYPES.forEach(type => {
+    NODE_TYPES.forEach((type) => {
       nodesByType[type] = this.index.byType.get(type)?.length || 0;
     });
 
     // Count edges by type
     const edgesByType = {} as Record<EdgeType, number>;
-    EDGE_TYPES.forEach(type => {
+    EDGE_TYPES.forEach((type) => {
       edgesByType[type] = 0;
     });
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       edgesByType[edge.type]++;
     });
 
     // Calculate degrees
-    const degrees = this.nodes.map(node => this.getDegree(node.id));
-    const averageDegree = degrees.length > 0 ? degrees.reduce((a, b) => a + b, 0) / degrees.length : 0;
+    const degrees = this.nodes.map((node) => this.getDegree(node.id));
+    const averageDegree =
+      degrees.length > 0
+        ? degrees.reduce((a, b) => a + b, 0) / degrees.length
+        : 0;
     const maxDegree = degrees.length > 0 ? Math.max(...degrees) : 0;
 
     // Calculate density (actual edges / possible edges)
@@ -311,7 +316,9 @@ export class Graph implements GraphInterface {
     const density = possibleEdges > 0 ? edgeCount / possibleEdges : 0;
 
     // Calculate connected components (simplified - just count nodes with degree 0)
-    const components = this.nodes.filter(node => this.getDegree(node.id) === 0).length;
+    const components = this.nodes.filter(
+      (node) => this.getDegree(node.id) === 0
+    ).length;
 
     // Update statistics
     Object.assign(this.statistics, {
@@ -322,7 +329,7 @@ export class Graph implements GraphInterface {
       averageDegree,
       maxDegree,
       density,
-      components
+      components,
     });
   }
 
@@ -332,16 +339,63 @@ export class Graph implements GraphInterface {
   private extractKeywords(content: string): string[] {
     // Simple keyword extraction: split by whitespace, filter common words
     const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by',
-      'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'do', 'does',
-      'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that',
-      'these', 'those', 'i', 'you', 'he', 'she', 'it', 'we', 'they', 'me', 'him', 'her', 'us', 'them'
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'is',
+      'are',
+      'was',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'could',
+      'should',
+      'may',
+      'might',
+      'must',
+      'can',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'me',
+      'him',
+      'her',
+      'us',
+      'them',
     ]);
 
     return content
       .toLowerCase()
       .split(/\W+/)
-      .filter(word => word.length > 2 && !stopWords.has(word))
+      .filter((word) => word.length > 2 && !stopWords.has(word))
       .filter((word, index, arr) => arr.indexOf(word) === index); // Remove duplicates
   }
 
@@ -351,22 +405,22 @@ export class Graph implements GraphInterface {
   serialize(): GraphSerialization {
     return {
       metadata: this.metadata,
-      nodes: this.nodes.map(node => ({
+      nodes: this.nodes.map((node) => ({
         id: node.id,
         type: node.type,
         label: node.label,
         content: node.content,
         position: node.position,
-        metadata: node.metadata
+        metadata: node.metadata,
       })),
-      edges: this.edges.map(edge => ({
+      edges: this.edges.map((edge) => ({
         id: edge.id,
         source: edge.source,
         target: edge.target,
         type: edge.type,
         weight: edge.weight,
-        metadata: edge.metadata
-      }))
+        metadata: edge.metadata,
+      })),
     };
   }
 
@@ -378,12 +432,14 @@ export class Graph implements GraphInterface {
     const warnings: string[] = [];
 
     // Check for orphaned nodes
-    const orphanedNodes = this.nodes.filter(node => this.getDegree(node.id) === 0).length;
+    const orphanedNodes = this.nodes.filter(
+      (node) => this.getDegree(node.id) === 0
+    ).length;
 
     // Check for duplicate node IDs
     const nodeIds = new Set<string>();
     const duplicateNodeIds = new Set<string>();
-    this.nodes.forEach(node => {
+    this.nodes.forEach((node) => {
       if (nodeIds.has(node.id)) {
         duplicateNodeIds.add(node.id);
       }
@@ -393,7 +449,7 @@ export class Graph implements GraphInterface {
     // Check for duplicate edge IDs
     const edgeIds = new Set<string>();
     const duplicateEdgeIds = new Set<string>();
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       if (edgeIds.has(edge.id)) {
         duplicateEdgeIds.add(edge.id);
       }
@@ -402,15 +458,18 @@ export class Graph implements GraphInterface {
 
     // Check for invalid edge references
     let invalidEdges = 0;
-    this.edges.forEach(edge => {
-      if (!this.index.nodeMap.has(edge.source) || !this.index.nodeMap.has(edge.target)) {
+    this.edges.forEach((edge) => {
+      if (
+        !this.index.nodeMap.has(edge.source) ||
+        !this.index.nodeMap.has(edge.target)
+      ) {
         invalidEdges++;
       }
     });
 
     // Check for self-referencing edges
     let selfReferencingEdges = 0;
-    this.edges.forEach(edge => {
+    this.edges.forEach((edge) => {
       if (edge.source === edge.target) {
         selfReferencingEdges++;
       }
@@ -444,8 +503,8 @@ export class Graph implements GraphInterface {
         duplicateNodeIds: duplicateNodeIds.size,
         duplicateEdgeIds: duplicateEdgeIds.size,
         invalidEdges,
-        selfReferencingEdges
-      }
+        selfReferencingEdges,
+      },
     };
   }
 
@@ -460,14 +519,14 @@ export class Graph implements GraphInterface {
     if (!validation.isValid) {
       logger.warn('Graph marked as complete but has validation errors', {
         errors: validation.errors,
-        graphId: this.id
+        graphId: this.id,
       });
     }
 
     logger.info('Graph marked as complete', {
       graphId: this.id,
       nodeCount: this.statistics.nodeCount,
-      edgeCount: this.statistics.edgeCount
+      edgeCount: this.statistics.edgeCount,
     });
   }
 
@@ -481,7 +540,7 @@ export class Graph implements GraphInterface {
 
     logger.error('Graph marked as error', {
       graphId: this.id,
-      error
+      error,
     });
   }
 
@@ -506,7 +565,7 @@ export class Graph implements GraphInterface {
       edgeCount: this.statistics.edgeCount,
       created_at: this.metadata.created_at,
       updated_at: this.metadata.updated_at,
-      processingTime: this.metadata.processingTime
+      processingTime: this.metadata.processingTime,
     };
   }
 }

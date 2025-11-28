@@ -89,7 +89,11 @@ export class PDFParserService {
       for (let i = 0; i < data.numpages; i++) {
         const pageContent = pageTexts[i] || '';
         const trimmedContent = pageContent.trim();
-        const pageMetadata = this.extractPageMetadata(trimmedContent, i + 1, charOffset);
+        const pageMetadata = this.extractPageMetadata(
+          trimmedContent,
+          i + 1,
+          charOffset
+        );
 
         pages.push(pageMetadata);
         fullText += trimmedContent + '\n';
@@ -99,24 +103,23 @@ export class PDFParserService {
       const result: PDFParseResult = {
         metadata,
         pages,
-        fullText: fullText.trim()
+        fullText: fullText.trim(),
       };
 
       logger.info('PDF parsing completed successfully', {
         filename,
         pages: metadata.pages,
-        totalChars: fullText.length
+        totalChars: fullText.length,
       });
 
       return result;
-
     } catch (error) {
       const corruptionType = this.detectCorruptionType(buffer, error);
       const errorDetails = {
         filename,
         corruptionType,
         fileSize: buffer.length,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
 
       logger.error('PDF parsing failed', errorDetails);
@@ -127,16 +130,19 @@ export class PDFParserService {
 
       switch (corruptionType) {
         case 'xref_corruption':
-          errorMessage = 'PDF file has corrupted cross-reference table. The file may be damaged or incomplete.';
+          errorMessage =
+            'PDF file has corrupted cross-reference table. The file may be damaged or incomplete.';
           break;
         case 'invalid_format':
-          errorMessage = 'Invalid PDF format. The file may not be a valid PDF document.';
+          errorMessage =
+            'Invalid PDF format. The file may not be a valid PDF document.';
           break;
         case 'truncated_file':
           errorMessage = 'PDF file appears to be truncated or incomplete.';
           break;
         case 'encrypted_pdf':
-          errorMessage = 'PDF file is encrypted or password-protected. Encrypted PDFs are not supported.';
+          errorMessage =
+            'PDF file is encrypted or password-protected. Encrypted PDFs are not supported.';
           statusCode = 422; // Unprocessable Entity
           break;
         case 'too_small':
@@ -176,14 +182,19 @@ export class PDFParserService {
     }
 
     // Fallback: split by double newlines and distribute more intelligently
-    const paragraphs = fullText.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    const paragraphs = fullText
+      .split(/\n\s*\n/)
+      .filter((p) => p.trim().length > 0);
 
     if (paragraphs.length === 0) {
       return Array(numPages).fill('');
     }
 
     // Estimate paragraphs per page based on total content
-    const avgParagraphsPerPage = Math.max(1, Math.floor(paragraphs.length / numPages));
+    const avgParagraphsPerPage = Math.max(
+      1,
+      Math.floor(paragraphs.length / numPages)
+    );
     const pages: string[] = [];
 
     for (let i = 0; i < numPages; i++) {
@@ -207,23 +218,33 @@ export class PDFParserService {
    * Note: pdf-parse doesn't provide text positioning by default.
    * For accurate positioning, consider using pdfjs-dist.
    */
-  private extractPageMetadata(pageContent: string, pageNumber: number, globalCharOffset: number = 0): PDFPage {
+  private extractPageMetadata(
+    pageContent: string,
+    pageNumber: number,
+    globalCharOffset: number = 0
+  ): PDFPage {
     // Estimate page dimensions (standard letter size in points)
     const width = 612; // 8.5 inches * 72 points
     const height = 792; // 11 inches * 72 points
 
     // Basic text elements extraction (approximate)
-    const lines = pageContent.split('\n').filter(line => line.trim().length > 0);
+    const lines = pageContent
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
     const textElements = lines.map((line, index) => ({
       text: line.trim(),
       x: 50, // Left margin estimate
-      y: 50 + (index * 14), // Top margin + line height estimate
+      y: 50 + index * 14, // Top margin + line height estimate
       width: Math.min(line.length * 8, width - 100), // Estimate width based on text length
-      height: 12 // Estimate line height
+      height: 12, // Estimate line height
     }));
 
     // Detect paragraphs in this page
-    const paragraphs = this.detectParagraphs(pageContent, pageNumber, globalCharOffset);
+    const paragraphs = this.detectParagraphs(
+      pageContent,
+      pageNumber,
+      globalCharOffset
+    );
 
     return {
       pageNumber,
@@ -231,7 +252,7 @@ export class PDFParserService {
       width,
       height,
       textElements,
-      paragraphs
+      paragraphs,
     };
   }
 
@@ -245,10 +266,14 @@ export class PDFParserService {
       subject: this.cleanMetadataString(data.info?.Subject),
       creator: this.cleanMetadataString(data.info?.Creator),
       producer: this.cleanMetadataString(data.info?.Producer),
-      creationDate: data.info?.CreationDate ? this.parsePDFDate(data.info.CreationDate) : undefined,
-      modificationDate: data.info?.ModDate ? this.parsePDFDate(data.info.ModDate) : undefined,
+      creationDate: data.info?.CreationDate
+        ? this.parsePDFDate(data.info.CreationDate)
+        : undefined,
+      modificationDate: data.info?.ModDate
+        ? this.parsePDFDate(data.info.ModDate)
+        : undefined,
       pages: data.numpages,
-      fileSize: buffer.length
+      fileSize: buffer.length,
     };
 
     // Extract keywords if available
@@ -265,7 +290,7 @@ export class PDFParserService {
     metadata.pageSize = {
       width: 612, // 8.5 inches * 72 points
       height: 792, // 11 inches * 72 points
-      unit: 'pt'
+      unit: 'pt',
     };
 
     // Check for encryption (basic detection)
@@ -336,21 +361,27 @@ export class PDFParserService {
     // Split by common separators: commas, semicolons, or spaces
     return keywordStr
       .split(/[;,]/)
-      .map(k => k.trim())
-      .filter(k => k.length > 0);
+      .map((k) => k.trim())
+      .filter((k) => k.length > 0);
   }
 
   /**
    * Detect paragraphs in text content using heuristics
    */
-  private detectParagraphs(text: string, pageNumber: number, charOffset: number): PDFParagraph[] {
+  private detectParagraphs(
+    text: string,
+    pageNumber: number,
+    charOffset: number
+  ): PDFParagraph[] {
     if (!text.trim()) return [];
 
     const paragraphs: PDFParagraph[] = [];
     let currentPosition = charOffset;
 
     // Split text by double newlines (paragraph breaks)
-    const rawParagraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
+    const rawParagraphs = text
+      .split(/\n\s*\n/)
+      .filter((p) => p.trim().length > 0);
 
     for (let i = 0; i < rawParagraphs.length; i++) {
       const paragraphText = rawParagraphs[i].trim();
@@ -360,7 +391,9 @@ export class PDFParserService {
       const endPosition = startPosition + paragraphText.length;
 
       // Count lines in this paragraph
-      const lines = paragraphText.split('\n').filter(line => line.trim().length > 0);
+      const lines = paragraphText
+        .split('\n')
+        .filter((line) => line.trim().length > 0);
       const lineCount = lines.length;
 
       // Calculate confidence based on heuristics
@@ -371,7 +404,8 @@ export class PDFParserService {
       if (sentenceCount >= 2) confidence += 0.2;
 
       // Higher confidence for paragraphs with reasonable length
-      if (paragraphText.length > 50 && paragraphText.length < 1000) confidence += 0.2;
+      if (paragraphText.length > 50 && paragraphText.length < 1000)
+        confidence += 0.2;
 
       // Lower confidence for very short paragraphs (might be titles/headings)
       if (paragraphText.length < 20) confidence -= 0.3;
@@ -386,7 +420,7 @@ export class PDFParserService {
         startPosition,
         endPosition,
         lineCount,
-        confidence
+        confidence,
       });
 
       // Update position for next paragraph (include the paragraph break)
@@ -456,7 +490,10 @@ export class PDFParserService {
     if (errorMessage.includes('Unexpected EOF')) {
       return 'truncated_file';
     }
-    if (errorMessage.includes('Bad password') || errorMessage.includes('encrypted')) {
+    if (
+      errorMessage.includes('Bad password') ||
+      errorMessage.includes('encrypted')
+    ) {
       return 'encrypted_pdf';
     }
     if (buffer.length < 100) {
@@ -492,7 +529,10 @@ export class PDFParserService {
   /**
    * Extract only metadata from PDF (lighter operation than full parsing)
    */
-  async extractMetadata(buffer: Buffer, filename?: string): Promise<PDFMetadata> {
+  async extractMetadata(
+    buffer: Buffer,
+    filename?: string
+  ): Promise<PDFMetadata> {
     try {
       logger.info('Extracting PDF metadata', { filename, size: buffer.length });
 
@@ -509,18 +549,17 @@ export class PDFParserService {
         filename,
         title: metadata.title,
         author: metadata.author,
-        pages: metadata.pages
+        pages: metadata.pages,
       });
 
       return metadata;
-
     } catch (error) {
       const corruptionType = this.detectCorruptionType(buffer, error);
       const errorDetails = {
         filename,
         corruptionType,
         fileSize: buffer.length,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
 
       logger.error('PDF metadata extraction failed', errorDetails);
@@ -531,16 +570,19 @@ export class PDFParserService {
 
       switch (corruptionType) {
         case 'xref_corruption':
-          errorMessage = 'PDF file has corrupted cross-reference table. The file may be damaged or incomplete.';
+          errorMessage =
+            'PDF file has corrupted cross-reference table. The file may be damaged or incomplete.';
           break;
         case 'invalid_format':
-          errorMessage = 'Invalid PDF format. The file may not be a valid PDF document.';
+          errorMessage =
+            'Invalid PDF format. The file may not be a valid PDF document.';
           break;
         case 'truncated_file':
           errorMessage = 'PDF file appears to be truncated or incomplete.';
           break;
         case 'encrypted_pdf':
-          errorMessage = 'PDF file is encrypted or password-protected. Encrypted PDFs are not supported.';
+          errorMessage =
+            'PDF file is encrypted or password-protected. Encrypted PDFs are not supported.';
           statusCode = 422; // Unprocessable Entity
           break;
         case 'too_small':
@@ -560,12 +602,15 @@ export class PDFParserService {
   /**
    * Extract paragraphs from PDF with metadata
    */
-  async extractParagraphs(buffer: Buffer, filename?: string): Promise<PDFParagraph[]> {
+  async extractParagraphs(
+    buffer: Buffer,
+    filename?: string
+  ): Promise<PDFParagraph[]> {
     const result = await this.parsePDF(buffer, filename);
     const allParagraphs: PDFParagraph[] = [];
 
     // Collect all paragraphs from all pages
-    result.pages.forEach(page => {
+    result.pages.forEach((page) => {
       if (page.paragraphs) {
         allParagraphs.push(...page.paragraphs);
       }
@@ -590,17 +635,23 @@ export class PDFParserService {
         totalParagraphs: 0,
         avgParagraphLength: 0,
         avgConfidence: 0,
-        paragraphsByPage: []
+        paragraphsByPage: [],
       };
     }
 
-    const totalLength = paragraphs.reduce((sum, p) => sum + p.content.length, 0);
-    const totalConfidence = paragraphs.reduce((sum, p) => sum + p.confidence, 0);
+    const totalLength = paragraphs.reduce(
+      (sum, p) => sum + p.content.length,
+      0
+    );
+    const totalConfidence = paragraphs.reduce(
+      (sum, p) => sum + p.confidence,
+      0
+    );
 
     // Count paragraphs per page
-    const maxPage = Math.max(...paragraphs.map(p => p.pageNumber));
+    const maxPage = Math.max(...paragraphs.map((p) => p.pageNumber));
     const paragraphsByPage = Array(maxPage).fill(0);
-    paragraphs.forEach(p => {
+    paragraphs.forEach((p) => {
       paragraphsByPage[p.pageNumber - 1]++;
     });
 
@@ -608,7 +659,7 @@ export class PDFParserService {
       totalParagraphs: paragraphs.length,
       avgParagraphLength: Math.round(totalLength / paragraphs.length),
       avgConfidence: totalConfidence / paragraphs.length,
-      paragraphsByPage
+      paragraphsByPage,
     };
   }
 }

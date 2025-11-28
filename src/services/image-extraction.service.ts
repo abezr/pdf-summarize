@@ -49,17 +49,24 @@ export class ImageExtractionService {
       // Configure pdf2pic with default options
       this.pdf2picOptions = {
         density: 150, // DPI
-        saveFilename: "page",
-        savePath: "./temp",
-        format: "png",
+        saveFilename: 'page',
+        savePath: './temp',
+        format: 'png',
         width: 2000, // Max width
-        height: 2000 // Max height
+        height: 2000, // Max height
       };
 
       logger.info('ImageExtractionService: Initialized with pdf2pic support');
     } catch (error) {
-      logger.error('ImageExtractionService: Failed to initialize libraries:', error);
-      throw new AppError('Failed to initialize image extraction libraries', 500, 'IMAGE_EXTRACTION_INIT_FAILED');
+      logger.error(
+        'ImageExtractionService: Failed to initialize libraries:',
+        error
+      );
+      throw new AppError(
+        'Failed to initialize image extraction libraries',
+        500,
+        'IMAGE_EXTRACTION_INIT_FAILED'
+      );
     }
   }
 
@@ -87,18 +94,24 @@ export class ImageExtractionService {
         quality: options.quality || 90,
         width: options.maxWidth || 2000,
         height: options.maxHeight || 2000,
-        ...this.pdf2picOptions
+        ...this.pdf2picOptions,
       };
 
       // Validate format
       const supportedFormats = ['png', 'jpeg', 'tiff'];
       if (!supportedFormats.includes(config.format)) {
-        throw new AppError(`Unsupported image format: ${config.format}. Supported: ${supportedFormats.join(', ')}`, 400, 'UNSUPPORTED_FORMAT');
+        throw new AppError(
+          `Unsupported image format: ${config.format}. Supported: ${supportedFormats.join(', ')}`,
+          400,
+          'UNSUPPORTED_FORMAT'
+        );
       }
 
       // Validate DPI range
       if (config.density < 72 || config.density > 600) {
-        logger.warn(`ImageExtractionService: DPI ${config.density} is outside recommended range 72-600`);
+        logger.warn(
+          `ImageExtractionService: DPI ${config.density} is outside recommended range 72-600`
+        );
       }
 
       // Determine pages to process
@@ -118,16 +131,24 @@ export class ImageExtractionService {
         // Process all pages
         const pageCount = await this.getPageCount(pdfPath);
         pagesToProcess = Array.from({ length: pageCount }, (_, i) => i + 1);
-        logger.info(`ImageExtractionService: Processing all ${pageCount} pages`);
+        logger.info(
+          `ImageExtractionService: Processing all ${pageCount} pages`
+        );
       }
 
       // Validate page numbers
       const maxPages = await this.getPageCount(pdfPath);
-      const validPages = pagesToProcess.filter(pageNum => pageNum >= 1 && pageNum <= maxPages);
+      const validPages = pagesToProcess.filter(
+        (pageNum) => pageNum >= 1 && pageNum <= maxPages
+      );
 
       if (validPages.length !== pagesToProcess.length) {
-        const invalidPages = pagesToProcess.filter(pageNum => pageNum < 1 || pageNum > maxPages);
-        logger.warn(`ImageExtractionService: Skipping invalid page numbers: ${invalidPages.join(', ')} (valid range: 1-${maxPages})`);
+        const invalidPages = pagesToProcess.filter(
+          (pageNum) => pageNum < 1 || pageNum > maxPages
+        );
+        logger.warn(
+          `ImageExtractionService: Skipping invalid page numbers: ${invalidPages.join(', ')} (valid range: 1-${maxPages})`
+        );
       }
 
       // Process pages with progress tracking
@@ -136,7 +157,9 @@ export class ImageExtractionService {
 
       for (const pageNum of validPages) {
         try {
-          logger.debug(`ImageExtractionService: Processing page ${pageNum}/${totalPages}`);
+          logger.debug(
+            `ImageExtractionService: Processing page ${pageNum}/${totalPages}`
+          );
           const result = await convert(pageNum);
 
           if (result && result.path) {
@@ -152,21 +175,29 @@ export class ImageExtractionService {
               processedCount++;
             }
           } else {
-            logger.warn(`ImageExtractionService: No result returned for page ${pageNum}`);
+            logger.warn(
+              `ImageExtractionService: No result returned for page ${pageNum}`
+            );
           }
         } catch (error) {
-          logger.error(`ImageExtractionService: Failed to extract image from page ${pageNum}:`, error);
+          logger.error(
+            `ImageExtractionService: Failed to extract image from page ${pageNum}:`,
+            error
+          );
           // Continue processing other pages
         }
       }
 
-      logger.info(`ImageExtractionService: Successfully processed ${processedCount}/${totalPages} pages`);
+      logger.info(
+        `ImageExtractionService: Successfully processed ${processedCount}/${totalPages} pages`
+      );
 
       const duration = Date.now() - startTime;
-      logger.info(`ImageExtractionService: Extracted ${images.length} images in ${duration}ms`);
+      logger.info(
+        `ImageExtractionService: Extracted ${images.length} images in ${duration}ms`
+      );
 
       return images;
-
     } catch (error) {
       logger.error('ImageExtractionService: Image extraction failed:', error);
       throw new AppError(
@@ -191,8 +222,10 @@ export class ImageExtractionService {
       // pdf2pic saves the file directly, result.path contains the file path
       const sourcePath = result.path;
 
-      if (!sourcePath || !await this.fileExists(sourcePath)) {
-        logger.warn('ImageExtractionService: Source image file not found or invalid result');
+      if (!sourcePath || !(await this.fileExists(sourcePath))) {
+        logger.warn(
+          'ImageExtractionService: Source image file not found or invalid result'
+        );
         return null;
       }
 
@@ -204,17 +237,24 @@ export class ImageExtractionService {
       const fileName = `page_${pageNumber}_image_${imageNumber}_${timestamp}.${config.format}`;
 
       // Save to storage service
-      const storageResult = await storageService.saveImage(imageBuffer, fileName, {
-        baseDir: outputDir,
-        createSubdirs: true,
-        namingStrategy: 'original' // Use our generated filename
-      });
+      const storageResult = await storageService.saveImage(
+        imageBuffer,
+        fileName,
+        {
+          baseDir: outputDir,
+          createSubdirs: true,
+          namingStrategy: 'original', // Use our generated filename
+        }
+      );
 
       // Clean up the temporary file created by pdf2pic
       try {
         await fs.unlink(sourcePath);
       } catch (cleanupError) {
-        logger.warn('ImageExtractionService: Failed to clean up temporary file:', cleanupError);
+        logger.warn(
+          'ImageExtractionService: Failed to clean up temporary file:',
+          cleanupError
+        );
       }
 
       // Get image metadata using sharp
@@ -222,7 +262,10 @@ export class ImageExtractionService {
       try {
         metadata = await sharp(imageBuffer).metadata();
       } catch (metadataError) {
-        logger.warn('ImageExtractionService: Failed to extract image metadata:', metadataError);
+        logger.warn(
+          'ImageExtractionService: Failed to extract image metadata:',
+          metadataError
+        );
         metadata = {}; // Continue with empty metadata
       }
 
@@ -244,16 +287,20 @@ export class ImageExtractionService {
           hasAlpha: metadata.hasAlpha || false,
           compression: metadata.compression,
           storageId: storageResult.id,
-          mimeType: storageResult.mimeType
-        }
+          mimeType: storageResult.mimeType,
+        },
       };
 
-      logger.debug(`ImageExtractionService: Created image ${extractedImage.id} (${extractedImage.width}x${extractedImage.height}, ${extractedImage.size} bytes)`);
+      logger.debug(
+        `ImageExtractionService: Created image ${extractedImage.id} (${extractedImage.width}x${extractedImage.height}, ${extractedImage.size} bytes)`
+      );
 
       return extractedImage;
-
     } catch (error) {
-      logger.error('ImageExtractionService: Failed to process converted page:', error);
+      logger.error(
+        'ImageExtractionService: Failed to process converted page:',
+        error
+      );
       return null;
     }
   }
@@ -300,9 +347,10 @@ export class ImageExtractionService {
       // Cap at reasonable limits
       estimatedPages = Math.min(estimatedPages, 500);
 
-      logger.debug(`ImageExtractionService: Estimated ${estimatedPages} pages for ${fileSizeKB.toFixed(1)}KB file`);
+      logger.debug(
+        `ImageExtractionService: Estimated ${estimatedPages} pages for ${fileSizeKB.toFixed(1)}KB file`
+      );
       return estimatedPages;
-
     } catch (error) {
       logger.error('ImageExtractionService: Failed to get page count:', error);
       return 1; // Safe fallback
@@ -316,7 +364,7 @@ export class ImageExtractionService {
     return {
       pdf2picAvailable: !!this.pdf2picOptions,
       sharpAvailable: true, // sharp is imported
-      overallHealthy: !!this.pdf2picOptions
+      overallHealthy: !!this.pdf2picOptions,
     };
   }
 }

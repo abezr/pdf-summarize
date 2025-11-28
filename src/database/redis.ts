@@ -43,12 +43,9 @@ class RedisClient {
     }
   }
 
-  public async set(
-    key: string,
-    value: any,
-    ttl?: number
-  ): Promise<void> {
-    const serialized = typeof value === 'string' ? value : JSON.stringify(value);
+  public async set(key: string, value: any, ttl?: number): Promise<void> {
+    const serialized =
+      typeof value === 'string' ? value : JSON.stringify(value);
 
     if (ttl) {
       await this.client.setEx(key, ttl, serialized);

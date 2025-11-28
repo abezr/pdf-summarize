@@ -6,18 +6,18 @@
 import { Graph, GraphNode, NodeType } from '../../models/graph.model';
 
 export type SummaryType =
-  | 'executive'      // High-level overview for executives
-  | 'detailed'       // Comprehensive summary with all key points
-  | 'chapter'        // Summary organized by document sections
-  | 'bullet-points'  // Key takeaways as bullet points
-  | 'narrative'      // Story-like summary flowing through the document
-  | 'technical';     // Technical details for experts
+  | 'executive' // High-level overview for executives
+  | 'detailed' // Comprehensive summary with all key points
+  | 'chapter' // Summary organized by document sections
+  | 'bullet-points' // Key takeaways as bullet points
+  | 'narrative' // Story-like summary flowing through the document
+  | 'technical'; // Technical details for experts
 
 export interface SummaryRequest {
   type: SummaryType;
   graph: Graph;
   maxLength?: number; // Maximum length in words
-  focus?: string[];   // Specific topics to focus on
+  focus?: string[]; // Specific topics to focus on
   exclude?: string[]; // Topics to exclude
   style?: 'formal' | 'casual' | 'technical';
 }
@@ -34,7 +34,14 @@ export class PromptTemplateService {
    * Generate a complete prompt for summarization based on request
    */
   public generatePrompt(request: SummaryRequest): PromptTemplate {
-    const { type, graph, maxLength, focus, exclude, style = 'formal' } = request;
+    const {
+      type,
+      graph,
+      maxLength,
+      focus,
+      exclude,
+      style = 'formal',
+    } = request;
 
     // Get relevant nodes for summarization
     const summaryNodes = this.getRelevantNodes(graph, type);
@@ -50,20 +57,20 @@ export class PromptTemplateService {
       maxLength,
       focus,
       exclude,
-      style
+      style,
     });
 
     const userPrompt = this.customizeUserPrompt(template.userPrompt, {
       context,
       type,
-      maxLength
+      maxLength,
     });
 
     return {
       systemPrompt,
       userPrompt,
       context,
-      instructions: template.instructions
+      instructions: template.instructions,
     };
   }
 
@@ -76,43 +83,44 @@ export class PromptTemplateService {
     switch (type) {
       case 'executive':
         // Focus on high-level sections and key paragraphs
-        return nodes.filter(node =>
-          node.type === 'section' ||
-          (node.type === 'paragraph' && this.isKeyParagraph(node))
+        return nodes.filter(
+          (node) =>
+            node.type === 'section' ||
+            (node.type === 'paragraph' && this.isKeyParagraph(node))
         );
 
       case 'detailed':
         // Include all content nodes
-        return nodes.filter(node =>
+        return nodes.filter((node) =>
           ['section', 'paragraph', 'table', 'list'].includes(node.type)
         );
 
       case 'chapter':
         // Organize by sections
-        return nodes.filter(node =>
-          node.type === 'section' || node.type === 'paragraph'
+        return nodes.filter(
+          (node) => node.type === 'section' || node.type === 'paragraph'
         );
 
       case 'bullet-points':
         // Key points from all content
-        return nodes.filter(node =>
+        return nodes.filter((node) =>
           ['section', 'paragraph', 'list'].includes(node.type)
         );
 
       case 'narrative':
         // Sequential content for story flow
         return nodes
-          .filter(node => ['section', 'paragraph'].includes(node.type))
+          .filter((node) => ['section', 'paragraph'].includes(node.type))
           .sort((a, b) => a.position.start - b.position.start);
 
       case 'technical':
         // Technical content including code and tables
-        return nodes.filter(node =>
+        return nodes.filter((node) =>
           ['section', 'paragraph', 'table', 'code', 'list'].includes(node.type)
         );
 
       default:
-        return nodes.filter(node => node.type === 'paragraph');
+        return nodes.filter((node) => node.type === 'paragraph');
     }
   }
 
@@ -124,13 +132,25 @@ export class PromptTemplateService {
 
     // Keywords that indicate important content
     const keyIndicators = [
-      'summary', 'conclusion', 'introduction', 'overview',
-      'key', 'important', 'main', 'primary', 'significant',
-      'recommendation', 'finding', 'result', 'outcome'
+      'summary',
+      'conclusion',
+      'introduction',
+      'overview',
+      'key',
+      'important',
+      'main',
+      'primary',
+      'significant',
+      'recommendation',
+      'finding',
+      'result',
+      'outcome',
     ];
 
-    return keyIndicators.some(indicator => content.includes(indicator)) ||
-           content.length > 200; // Longer paragraphs likely contain more info
+    return (
+      keyIndicators.some((indicator) => content.includes(indicator)) ||
+      content.length > 200
+    ); // Longer paragraphs likely contain more info
   }
 
   /**
@@ -187,14 +207,14 @@ export class PromptTemplateService {
    * Find parent section for a node
    */
   private findParentSection(graph: Graph, nodeId: string): GraphNode | null {
-    const parentEdges = graph.edges.filter(edge =>
-      edge.target === nodeId && edge.type === 'contains'
+    const parentEdges = graph.edges.filter(
+      (edge) => edge.target === nodeId && edge.type === 'contains'
     );
 
     if (parentEdges.length === 0) return null;
 
-    const parentNode = graph.nodes.find(node =>
-      node.id === parentEdges[0].source && node.type === 'section'
+    const parentNode = graph.nodes.find(
+      (node) => node.id === parentEdges[0].source && node.type === 'section'
     );
 
     return parentNode || null;
@@ -203,7 +223,10 @@ export class PromptTemplateService {
   /**
    * Get template for summary type
    */
-  private getTemplateForType(type: SummaryType, style: string): Omit<PromptTemplate, 'context'> {
+  private getTemplateForType(
+    type: SummaryType,
+    style: string
+  ): Omit<PromptTemplate, 'context'> {
     const styleInstructions = this.getStyleInstructions(style);
 
     switch (type) {
@@ -221,8 +244,8 @@ Summary:`,
             'Highlight key findings or conclusions',
             'Include important metrics or data points',
             'Focus on implications and recommendations',
-            'Keep it concise and actionable'
-          ]
+            'Keep it concise and actionable',
+          ],
         };
 
       case 'detailed':
@@ -239,8 +262,8 @@ Detailed Summary:`,
             'Preserve important details and data',
             'Maintain logical flow and relationships',
             'Include supporting evidence for key points',
-            'Ensure completeness without unnecessary repetition'
-          ]
+            'Ensure completeness without unnecessary repetition',
+          ],
         };
 
       case 'chapter':
@@ -256,9 +279,9 @@ Chapter-by-Chapter Summary:`,
             'Identify main sections/chapters',
             'Create clear headings for each section',
             'Summarize each section comprehensively',
-            'Maintain the document\'s logical structure',
-            'Ensure smooth transitions between sections'
-          ]
+            "Maintain the document's logical structure",
+            'Ensure smooth transitions between sections',
+          ],
         };
 
       case 'bullet-points':
@@ -275,8 +298,8 @@ Key Takeaways:`,
             'Use clear, concise bullet points',
             'Organize logically (by topic or importance)',
             'Include specific data points and facts',
-            'Focus on actionable insights'
-          ]
+            'Focus on actionable insights',
+          ],
         };
 
       case 'narrative':
@@ -293,8 +316,8 @@ Narrative Summary:`,
             'Connect different sections logically',
             'Maintain chronological or logical progression',
             'Use transitions to link ideas',
-            'Make it engaging and easy to follow'
-          ]
+            'Make it engaging and easy to follow',
+          ],
         };
 
       case 'technical':
@@ -311,8 +334,8 @@ Technical Summary:`,
             'Include specific methodologies and processes',
             'Maintain accuracy of technical details',
             'Include data, specifications, and measurements',
-            'Focus on technical implications and applications'
-          ]
+            'Focus on technical implications and applications',
+          ],
         };
 
       default:
@@ -328,8 +351,8 @@ Summary:`,
             'Identify the main points',
             'Be concise yet comprehensive',
             'Maintain accuracy',
-            'Focus on important information'
-          ]
+            'Focus on important information',
+          ],
         };
     }
   }
@@ -342,7 +365,7 @@ Summary:`,
       case 'formal':
         return 'Use formal, professional language appropriate for business or academic contexts.';
       case 'casual':
-        return 'Use conversational, accessible language that\'s easy to understand.';
+        return "Use conversational, accessible language that's easy to understand.";
       case 'technical':
         return 'Use precise technical language and maintain technical accuracy.';
       default:
@@ -394,7 +417,10 @@ Summary:`,
 
     // Replace placeholders
     prompt = prompt.replace('{context}', params.context);
-    prompt = prompt.replace('{maxLength}', params.maxLength?.toString() || '500');
+    prompt = prompt.replace(
+      '{maxLength}',
+      params.maxLength?.toString() || '500'
+    );
 
     return prompt;
   }
@@ -411,7 +437,14 @@ Summary:`,
    * Get supported summary types
    */
   public getSupportedTypes(): SummaryType[] {
-    return ['executive', 'detailed', 'chapter', 'bullet-points', 'narrative', 'technical'];
+    return [
+      'executive',
+      'detailed',
+      'chapter',
+      'bullet-points',
+      'narrative',
+      'technical',
+    ];
   }
 }
 

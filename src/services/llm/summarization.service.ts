@@ -5,7 +5,11 @@
 
 import { Graph } from '../../models/graph.model';
 import { llmProviderManager } from './LLMProviderManager';
-import { promptTemplateService, SummaryType, SummaryRequest } from './prompt-templates';
+import {
+  promptTemplateService,
+  SummaryType,
+  SummaryRequest,
+} from './prompt-templates';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 
@@ -52,7 +56,7 @@ export class SummarizationService {
       logger.info('Starting graph summarization', {
         graphId: graph.id,
         documentId: graph.documentId,
-        options
+        options,
       });
 
       // Validate graph
@@ -71,10 +75,11 @@ export class SummarizationService {
         maxLength,
         focus: options.focus,
         exclude: options.exclude,
-        style: options.style
+        style: options.style,
       };
 
-      const promptTemplate = promptTemplateService.generatePrompt(promptRequest);
+      const promptTemplate =
+        promptTemplateService.generatePrompt(promptRequest);
 
       // Estimate tokens for cost planning
       const estimatedPromptTokens = promptTemplateService.estimateTokenCount(
@@ -84,7 +89,7 @@ export class SummarizationService {
       logger.info('Generated summarization prompt', {
         type: summaryType,
         estimatedPromptTokens,
-        contextLength: promptTemplate.context.length
+        contextLength: promptTemplate.context.length,
       });
 
       // Prepare LLM request
@@ -92,12 +97,12 @@ export class SummarizationService {
         messages: [
           {
             role: 'system' as const,
-            content: promptTemplate.systemPrompt
+            content: promptTemplate.systemPrompt,
           },
           {
             role: 'user' as const,
-            content: promptTemplate.userPrompt
-          }
+            content: promptTemplate.userPrompt,
+          },
         ],
         model: options.model,
         maxTokens: Math.min(maxLength * 4, 4096), // Rough token estimation
@@ -122,7 +127,7 @@ export class SummarizationService {
         tokensUsed: llmResponse.tokensUsed,
         cost: llmResponse.cost,
         processingTime,
-        graphStats
+        graphStats,
       };
 
       logger.info('Graph summarization completed', {
@@ -131,16 +136,15 @@ export class SummarizationService {
         tokensUsed: llmResponse.tokensUsed.total,
         cost: llmResponse.cost,
         processingTime,
-        nodesProcessed: graphStats.nodesProcessed
+        nodesProcessed: graphStats.nodesProcessed,
       });
 
       return result;
-
     } catch (error: any) {
       logger.error('Graph summarization failed', {
         graphId: graph.id,
         error: error.message,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
       });
 
       if (error instanceof AppError) {
@@ -148,7 +152,7 @@ export class SummarizationService {
       }
 
       throw new AppError('Summarization failed', 500, {
-        originalError: error.message
+        originalError: error.message,
       });
     }
   }
@@ -166,7 +170,7 @@ export class SummarizationService {
     logger.info('Generating multiple summaries', {
       graphId: graph.id,
       types,
-      count: types.length
+      count: types.length,
     });
 
     // Process summaries sequentially to avoid rate limits
@@ -176,7 +180,7 @@ export class SummarizationService {
       } catch (error: any) {
         logger.error(`Failed to generate ${type} summary`, {
           type,
-          error: error.message
+          error: error.message,
         });
         throw error; // Re-throw to stop processing
       }
@@ -189,10 +193,7 @@ export class SummarizationService {
         (sum, r) => sum + r.tokensUsed.total,
         0
       ),
-      totalCost: Object.values(results).reduce(
-        (sum, r) => sum + r.cost,
-        0
-      )
+      totalCost: Object.values(results).reduce((sum, r) => sum + r.cost, 0),
     });
 
     return results;
@@ -205,8 +206,10 @@ export class SummarizationService {
     graph: Graph,
     promptTemplate: any
   ): SummarizationResult['graphStats'] {
-    const sectionsFound = graph.nodes.filter(n => n.type === 'section').length;
-    const paragraphsProcessed = graph.nodes.filter(n =>
+    const sectionsFound = graph.nodes.filter(
+      (n) => n.type === 'section'
+    ).length;
+    const paragraphsProcessed = graph.nodes.filter((n) =>
       ['paragraph', 'section'].includes(n.type)
     ).length;
     const totalContentLength = graph.nodes.reduce(
@@ -217,7 +220,7 @@ export class SummarizationService {
     return {
       nodesProcessed: paragraphsProcessed,
       sectionsFound,
-      totalContentLength
+      totalContentLength,
     };
   }
 
@@ -246,7 +249,7 @@ export class SummarizationService {
       maxLength: options.maxLength,
       focus: options.focus,
       exclude: options.exclude,
-      style: options.style
+      style: options.style,
     };
 
     const promptTemplate = promptTemplateService.generatePrompt(promptRequest);
@@ -260,7 +263,8 @@ export class SummarizationService {
       2000 // Reasonable upper limit
     );
 
-    const totalEstimatedTokens = estimatedPromptTokens + estimatedCompletionTokens;
+    const totalEstimatedTokens =
+      estimatedPromptTokens + estimatedCompletionTokens;
 
     // Get cost estimate (using default provider)
     const provider = llmProviderManager.getProvider(options.provider || 'auto');
@@ -272,8 +276,9 @@ export class SummarizationService {
       // OpenAI pricing approximation
       const inputCostPerToken = 0.005 / 1000; // GPT-4o input
       const outputCostPerToken = 0.015 / 1000; // GPT-4o output
-      estimatedCost = (estimatedPromptTokens * inputCostPerToken) +
-                     (estimatedCompletionTokens * outputCostPerToken);
+      estimatedCost =
+        estimatedPromptTokens * inputCostPerToken +
+        estimatedCompletionTokens * outputCostPerToken;
     } else if (provider.name === 'google') {
       // Google pricing approximation (very rough)
       const costPerToken = 0.0005 / 1000; // Approximate
@@ -283,7 +288,7 @@ export class SummarizationService {
     return {
       estimatedTokens: totalEstimatedTokens,
       estimatedCost,
-      recommendedModel: model
+      recommendedModel: model,
     };
   }
 
@@ -300,12 +305,21 @@ export class SummarizationService {
       );
     }
 
-    if (options.maxLength && (options.maxLength < 50 || options.maxLength > 5000)) {
+    if (
+      options.maxLength &&
+      (options.maxLength < 50 || options.maxLength > 5000)
+    ) {
       throw new AppError('maxLength must be between 50 and 5000 words', 400);
     }
 
-    if (options.style && !['formal', 'casual', 'technical'].includes(options.style)) {
-      throw new AppError('style must be one of: formal, casual, technical', 400);
+    if (
+      options.style &&
+      !['formal', 'casual', 'technical'].includes(options.style)
+    ) {
+      throw new AppError(
+        'style must be one of: formal, casual, technical',
+        400
+      );
     }
   }
 }

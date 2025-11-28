@@ -74,13 +74,10 @@ export class OpenAIProvider implements ILLMProvider {
       const processingTime = Date.now() - startTime;
 
       // Record usage for analytics
-      tokenManager.recordUsage(
-        model,
-        'openai',
-        'text-generation',
-        tokensUsed,
-        { requestModel: request.model, maxTokens: request.maxTokens }
-      );
+      tokenManager.recordUsage(model, 'openai', 'text-generation', tokensUsed, {
+        requestModel: request.model,
+        maxTokens: request.maxTokens,
+      });
 
       logger.info('OpenAI text generation completed', {
         model,
@@ -186,7 +183,6 @@ export class OpenAIProvider implements ILLMProvider {
       });
     }
   }
-
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;

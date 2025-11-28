@@ -7,7 +7,10 @@
 
 import { GraphEdge } from '../../models/graph.model';
 import { Graph } from './graph';
-import { ReferenceAnalysis, ReferenceResolution } from './reference-detection.service';
+import {
+  ReferenceAnalysis,
+  ReferenceResolution,
+} from './reference-detection.service';
 import { ReferenceType } from './reference-patterns';
 import { logger } from '../../utils/logger';
 

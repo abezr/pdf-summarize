@@ -10,7 +10,7 @@ import {
   createValidationMiddleware,
   DocumentQuerySchema,
   SummarizationOptionsSchema,
-  FileUploadSchema
+  FileUploadSchema,
 } from '../schemas';
 
 const router = Router();
@@ -49,10 +49,7 @@ router.get(
  * Get document by ID
  * GET /api/documents/:id
  */
-router.get(
-  '/:id',
-  documentController.getDocumentById.bind(documentController)
-);
+router.get('/:id', documentController.getDocumentById.bind(documentController));
 
 /**
  * Generate summary for a document

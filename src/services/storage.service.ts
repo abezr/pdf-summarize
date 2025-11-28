@@ -21,7 +21,11 @@ export interface StorageOptions {
 }
 
 export abstract class StorageBackend {
-  abstract save(buffer: Buffer, fileName: string, options?: StorageOptions): Promise<StorageResult>;
+  abstract save(
+    buffer: Buffer,
+    fileName: string,
+    options?: StorageOptions
+  ): Promise<StorageResult>;
   abstract get(filePath: string): Promise<Buffer>;
   abstract delete(filePath: string): Promise<void>;
   abstract exists(filePath: string): Promise<boolean>;
@@ -36,7 +40,11 @@ export class LocalStorageBackend extends StorageBackend {
     this.baseDir = baseDir;
   }
 
-  async save(buffer: Buffer, fileName: string, options: StorageOptions = {}): Promise<StorageResult> {
+  async save(
+    buffer: Buffer,
+    fileName: string,
+    options: StorageOptions = {}
+  ): Promise<StorageResult> {
     const baseDir = options.baseDir || this.baseDir;
     const namingStrategy = options.namingStrategy || 'timestamp';
 
@@ -75,8 +83,12 @@ export class LocalStorageBackend extends StorageBackend {
     const filePath = path.join(targetDir, finalFileName);
 
     // Check if file exists and handle overwrite
-    if (!options.overwrite && await this.exists(filePath)) {
-      throw new AppError(`File already exists: ${filePath}`, 409, 'FILE_EXISTS');
+    if (!options.overwrite && (await this.exists(filePath))) {
+      throw new AppError(
+        `File already exists: ${filePath}`,
+        409,
+        'FILE_EXISTS'
+      );
     }
 
     // Write file
@@ -85,7 +97,9 @@ export class LocalStorageBackend extends StorageBackend {
     // Get file stats
     const stats = await fs.stat(filePath);
 
-    logger.debug(`LocalStorageBackend: Saved file ${filePath} (${stats.size} bytes)`);
+    logger.debug(
+      `LocalStorageBackend: Saved file ${filePath} (${stats.size} bytes)`
+    );
 
     return {
       id: path.relative(this.baseDir, filePath),
@@ -95,13 +109,15 @@ export class LocalStorageBackend extends StorageBackend {
       mimeType: this.getMimeType(extension),
       metadata: {
         created: stats.birthtime,
-        modified: stats.mtime
-      }
+        modified: stats.mtime,
+      },
     };
   }
 
   async get(filePath: string): Promise<Buffer> {
-    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.baseDir, filePath);
+    const fullPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(this.baseDir, filePath);
 
     try {
       return await fs.readFile(fullPath);
@@ -111,21 +127,33 @@ export class LocalStorageBackend extends StorageBackend {
   }
 
   async delete(filePath: string): Promise<void> {
-    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.baseDir, filePath);
+    const fullPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(this.baseDir, filePath);
 
     try {
       await fs.unlink(fullPath);
       logger.debug(`LocalStorageBackend: Deleted file ${fullPath}`);
     } catch (error) {
       if ((error as any).code === 'ENOENT') {
-        throw new AppError(`File not found: ${filePath}`, 404, 'FILE_NOT_FOUND');
+        throw new AppError(
+          `File not found: ${filePath}`,
+          404,
+          'FILE_NOT_FOUND'
+        );
       }
-      throw new AppError(`Failed to delete file: ${filePath}`, 500, 'DELETE_FAILED');
+      throw new AppError(
+        `Failed to delete file: ${filePath}`,
+        500,
+        'DELETE_FAILED'
+      );
     }
   }
 
   async exists(filePath: string): Promise<boolean> {
-    const fullPath = path.isAbsolute(filePath) ? filePath : path.join(this.baseDir, filePath);
+    const fullPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(this.baseDir, filePath);
 
     try {
       await fs.access(fullPath);
@@ -139,7 +167,7 @@ export class LocalStorageBackend extends StorageBackend {
     // Check if base directory is accessible
     return {
       healthy: true, // Local filesystem is always accessible in this context
-      message: `Base directory: ${this.baseDir}`
+      message: `Base directory: ${this.baseDir}`,
     };
   }
 
@@ -152,7 +180,7 @@ export class LocalStorageBackend extends StorageBackend {
       '.tif': 'image/tiff',
       '.pdf': 'application/pdf',
       '.txt': 'text/plain',
-      '.json': 'application/json'
+      '.json': 'application/json',
     };
 
     return mimeTypes[extension.toLowerCase()] || 'application/octet-stream';
@@ -169,14 +197,18 @@ export class StorageService {
       createSubdirs: false,
       namingStrategy: 'timestamp',
       overwrite: false,
-      ...defaultOptions
+      ...defaultOptions,
     };
   }
 
   /**
    * Save a file to storage
    */
-  async save(buffer: Buffer, fileName: string, options: StorageOptions = {}): Promise<StorageResult> {
+  async save(
+    buffer: Buffer,
+    fileName: string,
+    options: StorageOptions = {}
+  ): Promise<StorageResult> {
     const mergedOptions = { ...this.defaultOptions, ...options };
     return this.backend.save(buffer, fileName, mergedOptions);
   }
@@ -184,11 +216,15 @@ export class StorageService {
   /**
    * Save an image with specific options optimized for images
    */
-  async saveImage(buffer: Buffer, fileName: string, options: StorageOptions = {}): Promise<StorageResult> {
+  async saveImage(
+    buffer: Buffer,
+    fileName: string,
+    options: StorageOptions = {}
+  ): Promise<StorageResult> {
     const imageOptions = {
       ...this.defaultOptions,
       createSubdirs: true, // Organize images by date
-      ...options
+      ...options,
     };
 
     return this.backend.save(buffer, fileName, imageOptions);

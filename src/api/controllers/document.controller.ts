@@ -9,7 +9,10 @@ import { documentService } from '../../services/document.service';
 import { pdfParserService } from '../../services/pdf-parser.service';
 import { GraphBuilder } from '../../services/graph/graph-builder';
 import { summarizationService } from '../../services/llm/summarization.service';
-import { imageExtractionService, ExtractedImage } from '../../services/image-extraction.service';
+import {
+  imageExtractionService,
+  ExtractedImage,
+} from '../../services/image-extraction.service';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 import {
@@ -27,7 +30,7 @@ import {
   ApiResponseSchema,
   PaginatedResponseSchema,
   DocumentStatsResponseSchema,
-  SummarizationResponseSchema
+  SummarizationResponseSchema,
 } from '../schemas';
 
 // Extend Express Request type to include validated data
@@ -53,19 +56,19 @@ export class DocumentController {
         res.status(400).json({
           success: false,
           error: { code: 'NO_FILE', message: 'No file uploaded' },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         return;
       }
 
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
       const file = req.file as Express.Multer.File;
 
       logger.info('Processing PDF upload', {
         filename: file.originalname,
         size: file.size,
         mimetype: file.mimetype,
-        userId
+        userId,
       });
 
       // Create document record
@@ -77,14 +80,19 @@ export class DocumentController {
         metadata: {
           original_filename: file.originalname,
           upload_timestamp: new Date().toISOString(),
-          mimetype: file.mimetype
-        }
+          mimetype: file.mimetype,
+        },
       };
 
       const document = await documentService.createDocument(documentInput);
 
       // Start background processing
-      this.processDocumentAsync(document.id, file.path, file.originalname, userId);
+      this.processDocumentAsync(
+        document.id,
+        file.path,
+        file.originalname,
+        userId
+      );
 
       res.status(201).json({
         success: true,
@@ -93,13 +101,12 @@ export class DocumentController {
             id: document.id,
             filename: document.filename,
             status: document.status,
-            created_at: document.created_at
-          }
+            created_at: document.created_at,
+          },
         },
         message: 'Document uploaded successfully. Processing started.',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Document upload failed', { error: error.message });
 
@@ -107,9 +114,9 @@ export class DocumentController {
         success: false,
         error: {
           code: error.name || 'UPLOAD_ERROR',
-          message: error.message || 'Document upload failed'
+          message: error.message || 'Document upload failed',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -120,8 +127,10 @@ export class DocumentController {
    */
   public async getDocuments(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const queryParams: DocumentQueryParams = req.validatedQuery || validateQueryParams(DocumentQuerySchema, req.query);
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
+      const queryParams: DocumentQueryParams =
+        req.validatedQuery ||
+        validateQueryParams(DocumentQuerySchema, req.query);
 
       const options = {
         userId,
@@ -129,7 +138,7 @@ export class DocumentController {
         limit: queryParams.limit,
         offset: queryParams.offset,
         orderBy: queryParams.order_by,
-        orderDirection: queryParams.order_direction
+        orderDirection: queryParams.order_direction,
       };
 
       const result = await documentService.getDocuments(options);
@@ -137,20 +146,19 @@ export class DocumentController {
       res.json({
         success: true,
         data: {
-          documents: result.documents.map(doc => ({
+          documents: result.documents.map((doc) => ({
             id: doc.id,
             filename: doc.filename,
             file_size: doc.file_size,
             status: doc.status,
             created_at: doc.created_at,
-            updated_at: doc.updated_at
+            updated_at: doc.updated_at,
           })),
           total: result.total,
-          has_more: result.hasMore
+          has_more: result.hasMore,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Failed to get documents', { error: error.message });
 
@@ -158,9 +166,9 @@ export class DocumentController {
         success: false,
         error: {
           code: error.name || 'FETCH_ERROR',
-          message: error.message || 'Failed to retrieve documents'
+          message: error.message || 'Failed to retrieve documents',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -171,10 +179,16 @@ export class DocumentController {
    */
   public async getDocumentById(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
+      const params: DocumentIdParams = validatePathParams(
+        DocumentIdParamSchema,
+        req.params
+      );
 
-      const document = await documentService.validateDocumentAccess(params.id, userId);
+      const document = await documentService.validateDocumentAccess(
+        params.id,
+        userId
+      );
 
       res.json({
         success: true,
@@ -189,27 +203,27 @@ export class DocumentController {
             summary: document.summary,
             metadata: document.metadata,
             created_at: document.created_at,
-            updated_at: document.updated_at
-          }
+            updated_at: document.updated_at,
+          },
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Failed to get document', {
         id: req.params.id,
-        error: error.message
+        error: error.message,
       });
 
-      const statusCode = error.statusCode || (error.message.includes('not found') ? 404 : 500);
+      const statusCode =
+        error.statusCode || (error.message.includes('not found') ? 404 : 500);
 
       res.status(statusCode).json({
         success: false,
         error: {
           code: error.name || 'FETCH_ERROR',
-          message: error.message || 'Failed to retrieve document'
+          message: error.message || 'Failed to retrieve document',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -220,8 +234,11 @@ export class DocumentController {
    */
   public async deleteDocument(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
+      const params: DocumentIdParams = validatePathParams(
+        DocumentIdParamSchema,
+        req.params
+      );
 
       // Verify document exists and user has access
       await documentService.validateDocumentAccess(params.id, userId);
@@ -233,7 +250,7 @@ export class DocumentController {
         res.status(404).json({
           success: false,
           error: { code: 'NOT_FOUND', message: 'Document not found' },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         return;
       }
@@ -242,22 +259,21 @@ export class DocumentController {
         success: true,
         data: { deleted: true },
         message: 'Document deleted successfully',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Failed to delete document', {
         id: req.params.id,
-        error: error.message
+        error: error.message,
       });
 
       res.status(error.statusCode || 500).json({
         success: false,
         error: {
           code: error.name || 'DELETE_ERROR',
-          message: error.message || 'Failed to delete document'
+          message: error.message || 'Failed to delete document',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -268,7 +284,7 @@ export class DocumentController {
    */
   public async getDocumentStats(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
 
       const stats = await documentService.getDocumentStats(userId);
 
@@ -278,11 +294,10 @@ export class DocumentController {
           total: stats.total,
           by_status: stats.byStatus,
           total_size: stats.totalSize,
-          recent_uploads: stats.recentUploads
+          recent_uploads: stats.recentUploads,
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Failed to get document stats', { error: error.message });
 
@@ -290,9 +305,9 @@ export class DocumentController {
         success: false,
         error: {
           code: error.name || 'STATS_ERROR',
-          message: error.message || 'Failed to retrieve document statistics'
+          message: error.message || 'Failed to retrieve document statistics',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -303,21 +318,29 @@ export class DocumentController {
    */
   public async summarizeDocument(req: Request, res: Response): Promise<void> {
     try {
-      const userId = req.user?.id || req.headers['x-user-id'] as string;
-      const params: DocumentIdParams = validatePathParams(DocumentIdParamSchema, req.params);
-      const options: SummarizationOptions = req.validatedBody || validateRequestBody(SummarizationOptionsSchema, req.body);
+      const userId = req.user?.id || (req.headers['x-user-id'] as string);
+      const params: DocumentIdParams = validatePathParams(
+        DocumentIdParamSchema,
+        req.params
+      );
+      const options: SummarizationOptions =
+        req.validatedBody ||
+        validateRequestBody(SummarizationOptionsSchema, req.body);
 
       // Verify document exists and has graph data
-      const document = await documentService.validateDocumentAccess(params.id, userId);
+      const document = await documentService.validateDocumentAccess(
+        params.id,
+        userId
+      );
 
       if (!document.graph_data) {
         res.status(400).json({
           success: false,
           error: {
             code: 'NO_GRAPH_DATA',
-            message: 'Document must be processed before summarization'
+            message: 'Document must be processed before summarization',
           },
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         });
         return;
       }
@@ -325,7 +348,7 @@ export class DocumentController {
       logger.info('Generating document summary', {
         documentId: params.id,
         type: options.type,
-        userId
+        userId,
       });
 
       // Generate summary
@@ -338,12 +361,16 @@ export class DocumentController {
           exclude: options.exclude,
           style: options.style,
           model: options.model,
-          provider: options.provider
+          provider: options.provider,
         }
       );
 
       // Store summary in document
-      await documentService.storeDocumentSummary(params.id, summaryResult.summary, userId);
+      await documentService.storeDocumentSummary(
+        params.id,
+        summaryResult.summary,
+        userId
+      );
 
       res.json({
         success: true,
@@ -355,25 +382,24 @@ export class DocumentController {
           tokens_used: summaryResult.tokensUsed,
           cost: summaryResult.cost,
           processing_time: summaryResult.processingTime,
-          graph_stats: summaryResult.graphStats
+          graph_stats: summaryResult.graphStats,
         },
         message: 'Summary generated successfully',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
-
     } catch (error: any) {
       logger.error('Failed to generate document summary', {
         documentId: req.params.id,
-        error: error.message
+        error: error.message,
       });
 
       res.status(error.statusCode || 500).json({
         success: false,
         error: {
           code: error.name || 'SUMMARIZATION_ERROR',
-          message: error.message || 'Failed to generate document summary'
+          message: error.message || 'Failed to generate document summary',
         },
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       });
     }
   }
@@ -393,7 +419,12 @@ export class DocumentController {
         logger.info('Starting document processing', { documentId, filePath });
 
         // Update status to processing
-        await documentService.updateDocumentStatus(documentId, 'processing', undefined, userId);
+        await documentService.updateDocumentStatus(
+          documentId,
+          'processing',
+          undefined,
+          userId
+        );
 
         // Parse PDF
         const fileBuffer = await fs.promises.readFile(filePath);
@@ -401,46 +432,58 @@ export class DocumentController {
         logger.info('PDF parsed successfully', {
           documentId,
           pages: pdfResult.pages.length,
-          totalChars: pdfResult.fullText.length
+          totalChars: pdfResult.fullText.length,
         });
 
         // Extract images from PDF
         let images: ExtractedImage[] = [];
         try {
           const outputDir = `./data/images/${documentId}`;
-          images = await imageExtractionService.extractImages(filePath, outputDir);
+          images = await imageExtractionService.extractImages(
+            filePath,
+            outputDir
+          );
           logger.info('Images extracted successfully', {
             documentId,
-            imageCount: images.length
+            imageCount: images.length,
           });
         } catch (error: any) {
           logger.warn('Image extraction failed, continuing without images', {
             documentId,
-            error: error.message
+            error: error.message,
           });
           // Continue processing even if image extraction fails
         }
 
         // Build graph
-        const graph = await GraphBuilder.buildGraph(documentId, pdfResult, undefined, images);
+        const graph = await GraphBuilder.buildGraph(
+          documentId,
+          pdfResult,
+          undefined,
+          images
+        );
         logger.info('Graph built successfully', {
           documentId,
           nodes: graph.nodes.length,
-          edges: graph.edges.length
+          edges: graph.edges.length,
         });
 
         // Store graph data
         await documentService.storeDocumentGraph(documentId, graph, userId);
 
         // Update status to completed
-        await documentService.updateDocumentStatus(documentId, 'completed', undefined, userId);
+        await documentService.updateDocumentStatus(
+          documentId,
+          'completed',
+          undefined,
+          userId
+        );
 
         logger.info('Document processing completed', { documentId });
-
       } catch (error: any) {
         logger.error('Document processing failed', {
           documentId,
-          error: error.message
+          error: error.message,
         });
 
         // Update status to failed

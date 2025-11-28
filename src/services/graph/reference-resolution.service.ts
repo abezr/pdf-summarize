@@ -232,7 +232,8 @@ export class ReferenceResolutionService {
 
     // Look for exact match in section labels or content
     for (const section of sectionNodes) {
-      const sectionNumber = ReferenceResolutionService.extractSectionNumber(section);
+      const sectionNumber =
+        ReferenceResolutionService.extractSectionNumber(section);
       if (sectionNumber === targetNumber) {
         return {
           targetNode: section,
@@ -262,17 +263,19 @@ export class ReferenceResolutionService {
 
     // Try partial matches and variations
     for (const section of sectionNodes) {
-      const sectionNumber = ReferenceResolutionService.extractSectionNumber(section);
+      const sectionNumber =
+        ReferenceResolutionService.extractSectionNumber(section);
 
       // Check for partial matches (e.g., "3.2" might match "3.2.1")
       if (
         sectionNumber?.startsWith(targetNumber) ||
         targetNumber.startsWith(sectionNumber || '')
       ) {
-        const confidence = ReferenceResolutionService.calculateFuzzyMatchConfidence(
-          targetNumber,
-          sectionNumber || ''
-        );
+        const confidence =
+          ReferenceResolutionService.calculateFuzzyMatchConfidence(
+            targetNumber,
+            sectionNumber || ''
+          );
         if (confidence > 0.6) {
           return {
             targetNode: section,
@@ -302,7 +305,8 @@ export class ReferenceResolutionService {
     const figureNodes = context.graph.getNodesByType('image');
 
     for (const figure of figureNodes) {
-      const figureNumber = ReferenceResolutionService.extractFigureNumber(figure);
+      const figureNumber =
+        ReferenceResolutionService.extractFigureNumber(figure);
       if (figureNumber === targetNumber) {
         return {
           targetNode: figure,
@@ -475,7 +479,11 @@ export class ReferenceResolutionService {
   ): ResolutionResult {
     // Only use semantic fallback for cross-references and spatial references
     // Not for explicit references that should have exact matches
-    if (reference.type === 'section' || reference.type === 'figure' || reference.type === 'table') {
+    if (
+      reference.type === 'section' ||
+      reference.type === 'figure' ||
+      reference.type === 'table'
+    ) {
       // For explicit references, don't use semantic fallback if the target looks like a number or is empty
       if (/^\d+(\.\d+)*$/.test(reference.target) || reference.target === '') {
         return {
@@ -488,7 +496,10 @@ export class ReferenceResolutionService {
 
     // This would require embeddings/similarity calculation
     // For now, return low confidence for any reasonable candidate
-    const candidates = ReferenceResolutionService.findReasonableCandidates(reference, context);
+    const candidates = ReferenceResolutionService.findReasonableCandidates(
+      reference,
+      context
+    );
     if (candidates.length > 0) {
       return {
         targetNode: candidates[0],
@@ -605,12 +616,18 @@ export class ReferenceResolutionService {
     }
 
     // Simple character overlap (exclude punctuation)
-    const targetChars = new Set(target.split('').filter(c => /[a-zA-Z0-9]/.test(c)));
-    const candidateChars = new Set(candidate.split('').filter(c => /[a-zA-Z0-9]/.test(c)));
+    const targetChars = new Set(
+      target.split('').filter((c) => /[a-zA-Z0-9]/.test(c))
+    );
+    const candidateChars = new Set(
+      candidate.split('').filter((c) => /[a-zA-Z0-9]/.test(c))
+    );
     const intersection = new Set(
       Array.from(targetChars).filter((x) => candidateChars.has(x))
     );
-    const union = new Set(Array.from(targetChars).concat(Array.from(candidateChars)));
+    const union = new Set(
+      Array.from(targetChars).concat(Array.from(candidateChars))
+    );
 
     return intersection.size / union.size;
   }

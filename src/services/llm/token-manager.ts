@@ -20,7 +20,7 @@ export interface CostBreakdown {
 }
 
 export interface ModelPricing {
-  input: number;  // Cost per 1K tokens for input
+  input: number; // Cost per 1K tokens for input
   output: number; // Cost per 1K tokens for output
   currency: string;
 }
@@ -45,44 +45,44 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'gpt-4o': {
     input: 0.005,
     output: 0.015,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gpt-4-turbo': {
     input: 0.01,
     output: 0.03,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gpt-4': {
     input: 0.03,
     output: 0.06,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gpt-3.5-turbo': {
     input: 0.0005,
     output: 0.0015,
-    currency: 'USD'
+    currency: 'USD',
   },
 
   // Google Gemini Models (approximate pricing)
   'gemini-2.0-flash-exp': {
     input: 0.001,
     output: 0.004,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gemini-1.5-flash': {
     input: 0.0005,
     output: 0.0015,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gemini-1.5-flash-8b': {
     input: 0.0002,
     output: 0.0008,
-    currency: 'USD'
+    currency: 'USD',
   },
   'gemini-1.5-pro': {
     input: 0.0035,
     output: 0.0105,
-    currency: 'USD'
+    currency: 'USD',
   },
 };
 
@@ -143,10 +143,7 @@ export class TokenManager {
   /**
    * Calculate cost breakdown for token usage
    */
-  public calculateCost(
-    model: string,
-    tokens: TokenUsage
-  ): CostBreakdown {
+  public calculateCost(model: string, tokens: TokenUsage): CostBreakdown {
     const pricing = MODEL_PRICING[model];
 
     if (!pricing) {
@@ -155,7 +152,7 @@ export class TokenManager {
         inputCost: 0,
         outputCost: 0,
         totalCost: 0,
-        currency: 'USD'
+        currency: 'USD',
       };
     }
 
@@ -168,7 +165,7 @@ export class TokenManager {
       inputCost: Number(inputCost.toFixed(6)),
       outputCost: Number(outputCost.toFixed(6)),
       totalCost: Number(totalCost.toFixed(6)),
-      currency: pricing.currency
+      currency: pricing.currency,
     };
   }
 
@@ -192,7 +189,7 @@ export class TokenManager {
       operation,
       tokens,
       cost,
-      metadata
+      metadata,
     };
 
     // Add to records (with size limit)
@@ -208,7 +205,7 @@ export class TokenManager {
       operation,
       tokensUsed: tokens.total,
       cost: cost.totalCost,
-      currency: cost.currency
+      currency: cost.currency,
     });
 
     return record;
@@ -217,9 +214,7 @@ export class TokenManager {
   /**
    * Get usage statistics for a time period
    */
-  public getUsageStats(
-    hours: number = 24
-  ): {
+  public getUsageStats(hours: number = 24): {
     totalTokens: number;
     totalCost: number;
     currency: string;
@@ -228,8 +223,10 @@ export class TokenManager {
     providers: Record<string, number>;
     recordsCount: number;
   } {
-    const cutoff = new Date(Date.now() - (hours * 60 * 60 * 1000));
-    const recentRecords = this.usageRecords.filter(r => r.timestamp >= cutoff);
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+    const recentRecords = this.usageRecords.filter(
+      (r) => r.timestamp >= cutoff
+    );
 
     const stats = {
       totalTokens: 0,
@@ -238,7 +235,7 @@ export class TokenManager {
       operations: {} as Record<string, number>,
       models: {} as Record<string, number>,
       providers: {} as Record<string, number>,
-      recordsCount: recentRecords.length
+      recordsCount: recentRecords.length,
     };
 
     for (const record of recentRecords) {
@@ -247,13 +244,16 @@ export class TokenManager {
       stats.currency = record.cost.currency;
 
       // Count by operation
-      stats.operations[record.operation] = (stats.operations[record.operation] || 0) + 1;
+      stats.operations[record.operation] =
+        (stats.operations[record.operation] || 0) + 1;
 
       // Count by model
-      stats.models[record.model] = (stats.models[record.model] || 0) + record.tokens.total;
+      stats.models[record.model] =
+        (stats.models[record.model] || 0) + record.tokens.total;
 
       // Count by provider
-      stats.providers[record.provider] = (stats.providers[record.provider] || 0) + record.tokens.total;
+      stats.providers[record.provider] =
+        (stats.providers[record.provider] || 0) + record.tokens.total;
     }
 
     return stats;
@@ -270,7 +270,7 @@ export class TokenManager {
     const tokens: TokenUsage = {
       prompt: estimatedPromptTokens,
       completion: estimatedCompletionTokens,
-      total: estimatedPromptTokens + estimatedCompletionTokens
+      total: estimatedPromptTokens + estimatedCompletionTokens,
     };
 
     return this.calculateCost(model, tokens);
@@ -288,8 +288,12 @@ export class TokenManager {
     cost: CostBreakdown;
     efficiency: number; // Relative to cheapest model (1.0 = cheapest)
   }> {
-    const comparisons = models.map(model => {
-      const cost = this.estimateCostForOperation(model, promptTokens, completionTokens);
+    const comparisons = models.map((model) => {
+      const cost = this.estimateCostForOperation(
+        model,
+        promptTokens,
+        completionTokens
+      );
       return { model, cost };
     });
 
@@ -299,10 +303,10 @@ export class TokenManager {
     );
 
     // Calculate efficiency relative to cheapest
-    return comparisons.map(comp => ({
+    return comparisons.map((comp) => ({
       model: comp.model,
       cost: comp.cost,
-      efficiency: comp.cost.totalCost / cheapest.cost.totalCost
+      efficiency: comp.cost.totalCost / cheapest.cost.totalCost,
     }));
   }
 
@@ -321,11 +325,13 @@ export class TokenManager {
       simple: ['gemini-1.5-flash-8b', 'gpt-3.5-turbo', 'gemini-1.5-flash'],
       complex: ['gpt-4o', 'gemini-1.5-pro', 'gpt-4-turbo'],
       creative: ['gpt-4o', 'gemini-1.5-pro', 'gpt-4-turbo'],
-      analysis: ['gemini-1.5-pro', 'gpt-4o', 'gpt-4-turbo']
+      analysis: ['gemini-1.5-pro', 'gpt-4o', 'gpt-4-turbo'],
     };
 
     const candidates = recommendations[taskType] || recommendations.simple;
-    const availableCandidates = candidates.filter(model => MODEL_PRICING[model]);
+    const availableCandidates = candidates.filter(
+      (model) => MODEL_PRICING[model]
+    );
 
     if (availableCandidates.length === 0) {
       throw new AppError(`No available models for task type: ${taskType}`, 500);
@@ -334,7 +340,7 @@ export class TokenManager {
     // Filter by budget if specified
     let finalCandidates = availableCandidates;
     if (maxBudget) {
-      finalCandidates = availableCandidates.filter(model => {
+      finalCandidates = availableCandidates.filter((model) => {
         const cost = this.estimateCostForOperation(model, 1000, 500);
         return cost.totalCost <= maxBudget;
       });
@@ -346,33 +352,32 @@ export class TokenManager {
     return {
       recommended,
       alternatives: finalCandidates.slice(1),
-      reasoning: `Recommended ${recommended} for ${taskType} tasks based on cost-performance balance.`
+      reasoning: `Recommended ${recommended} for ${taskType} tasks based on cost-performance balance.`,
     };
   }
 
   /**
    * Export usage data for analysis
    */
-  public exportUsageData(
-    hours: number = 24
-  ): UsageRecord[] {
-    const cutoff = new Date(Date.now() - (hours * 60 * 60 * 1000));
-    return this.usageRecords.filter(r => r.timestamp >= cutoff);
+  public exportUsageData(hours: number = 24): UsageRecord[] {
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+    return this.usageRecords.filter((r) => r.timestamp >= cutoff);
   }
 
   /**
    * Clear old usage records
    */
-  public clearOldRecords(hours: number = 168): void { // 7 days default
-    const cutoff = new Date(Date.now() - (hours * 60 * 60 * 1000));
+  public clearOldRecords(hours: number = 168): void {
+    // 7 days default
+    const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
     const beforeCount = this.usageRecords.length;
-    this.usageRecords = this.usageRecords.filter(r => r.timestamp > cutoff);
+    this.usageRecords = this.usageRecords.filter((r) => r.timestamp > cutoff);
     const afterCount = this.usageRecords.length;
 
     logger.info('Cleared old usage records', {
       hours,
       removed: beforeCount - afterCount,
-      remaining: afterCount
+      remaining: afterCount,
     });
   }
 

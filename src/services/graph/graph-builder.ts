@@ -4,7 +4,10 @@ import { PDFParseResult, PDFParagraph } from '../pdf-parser.service';
 import { ExtractedTable } from '../table-detection.service';
 import { ExtractedImage } from '../image-extraction.service';
 import { ReferenceDetectionService } from './reference-detection.service';
-import { ReferenceResolutionService, ResolutionContext } from './reference-resolution.service';
+import {
+  ReferenceResolutionService,
+  ResolutionContext,
+} from './reference-resolution.service';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
 
@@ -16,14 +19,22 @@ export class GraphBuilder {
   /**
    * Build a complete graph from PDF parsing results
    */
-  static async buildGraph(documentId: string, pdfResult: PDFParseResult, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<Graph> {
+  static async buildGraph(
+    documentId: string,
+    pdfResult: PDFParseResult,
+    tables?: ExtractedTable[],
+    images?: ExtractedImage[]
+  ): Promise<Graph> {
     const startTime = Date.now();
 
     try {
       logger.info('Starting graph building', {
         documentId,
         pages: pdfResult.metadata.pages,
-        totalParagraphs: pdfResult.pages.reduce((sum, page) => sum + (page.paragraphs?.length || 0), 0)
+        totalParagraphs: pdfResult.pages.reduce(
+          (sum, page) => sum + (page.paragraphs?.length || 0),
+          0
+        ),
       });
 
       // Create new graph instance
@@ -41,15 +52,14 @@ export class GraphBuilder {
         documentId,
         nodeCount: graph.statistics.nodeCount,
         edgeCount: graph.statistics.edgeCount,
-        processingTimeMs: processingTime
+        processingTimeMs: processingTime,
       });
 
       return graph;
-
     } catch (error) {
       logger.error('Graph building failed', {
         documentId,
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : 'Unknown error',
       });
 
       // Create graph with error status
@@ -63,7 +73,12 @@ export class GraphBuilder {
   /**
    * Build the complete graph structure from PDF results
    */
-  private static async buildGraphStructure(graph: Graph, pdfResult: PDFParseResult, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<void> {
+  private static async buildGraphStructure(
+    graph: Graph,
+    pdfResult: PDFParseResult,
+    tables?: ExtractedTable[],
+    images?: ExtractedImage[]
+  ): Promise<void> {
     // 1. Create document root node
     const documentNode = GraphFactory.createDocumentNode(
       pdfResult.metadata.title || 'Untitled Document',
@@ -80,8 +95,8 @@ export class GraphBuilder {
           keywords: pdfResult.metadata.keywords,
           language: pdfResult.metadata.language,
           pageSize: pdfResult.metadata.pageSize,
-          encryption: pdfResult.metadata.encryption
-        }
+          encryption: pdfResult.metadata.encryption,
+        },
       }
     );
     graph.addNode(documentNode);
@@ -107,7 +122,10 @@ export class GraphBuilder {
   /**
    * Create metadata nodes for document properties
    */
-  private static createMetadataNodes(graph: Graph, metadata: PDFParseResult['metadata']): void {
+  private static createMetadataNodes(
+    graph: Graph,
+    metadata: PDFParseResult['metadata']
+  ): void {
     // Create metadata nodes for key properties
     if (metadata.author) {
       const authorNode = GraphFactory.createMetadataNode(
@@ -140,7 +158,13 @@ export class GraphBuilder {
   /**
    * Process a single page and create nodes for its content
    */
-  private static async processPage(graph: Graph, page: PDFParseResult['pages'][0], documentNodeId: string, tables?: ExtractedTable[], images?: ExtractedImage[]): Promise<void> {
+  private static async processPage(
+    graph: Graph,
+    page: PDFParseResult['pages'][0],
+    documentNodeId: string,
+    tables?: ExtractedTable[],
+    images?: ExtractedImage[]
+  ): Promise<void> {
     // Create hierarchical containment: document → page content
     const pageContainerNode = GraphFactory.createNode({
       type: 'metadata',
@@ -149,21 +173,24 @@ export class GraphBuilder {
       position: {
         page: page.pageNumber,
         start: 0,
-        end: page.content.length
+        end: page.content.length,
       },
       metadata: {
         properties: {
           pageNumber: page.pageNumber,
           width: page.width,
           height: page.height,
-          textElements: page.textElements?.length || 0
-        }
-      }
+          textElements: page.textElements?.length || 0,
+        },
+      },
     });
     graph.addNode(pageContainerNode);
 
     // Connect document to page
-    const docToPageEdge = GraphFactory.createContainsEdge(documentNodeId, pageContainerNode.id);
+    const docToPageEdge = GraphFactory.createContainsEdge(
+      documentNodeId,
+      pageContainerNode.id
+    );
     graph.addEdge(docToPageEdge);
 
     // Process paragraphs
@@ -173,7 +200,10 @@ export class GraphBuilder {
         graph.addNode(paragraphNode);
 
         // Connect page to paragraph
-        const pageToParaEdge = GraphFactory.createContainsEdge(pageContainerNode.id, paragraphNode.id);
+        const pageToParaEdge = GraphFactory.createContainsEdge(
+          pageContainerNode.id,
+          paragraphNode.id
+        );
         graph.addEdge(pageToParaEdge);
       }
     } else {
@@ -183,19 +213,32 @@ export class GraphBuilder {
         graph.addNode(fallbackParagraph);
 
         // Connect page to paragraph
-        const pageToParaEdge = GraphFactory.createContainsEdge(pageContainerNode.id, fallbackParagraph.id);
+        const pageToParaEdge = GraphFactory.createContainsEdge(
+          pageContainerNode.id,
+          fallbackParagraph.id
+        );
         graph.addEdge(pageToParaEdge);
       }
     }
 
     // Process tables on this page
     if (tables && tables.length > 0) {
-      this.processTablesOnPage(graph, tables, page.pageNumber, pageContainerNode.id);
+      this.processTablesOnPage(
+        graph,
+        tables,
+        page.pageNumber,
+        pageContainerNode.id
+      );
     }
 
     // Process images on this page
     if (images && images.length > 0) {
-      this.processImagesOnPage(graph, images, page.pageNumber, pageContainerNode.id);
+      this.processImagesOnPage(
+        graph,
+        images,
+        page.pageNumber,
+        pageContainerNode.id
+      );
     }
 
     // Process text elements (simplified - could be enhanced for better structure detection)
@@ -207,20 +250,22 @@ export class GraphBuilder {
   /**
    * Create a paragraph node from PDF paragraph data
    */
-  private static createParagraphNode(paragraph: PDFParagraph): ReturnType<typeof GraphFactory.createParagraphNode> {
+  private static createParagraphNode(
+    paragraph: PDFParagraph
+  ): ReturnType<typeof GraphFactory.createParagraphNode> {
     return GraphFactory.createParagraphNode(
       paragraph.content,
       {
         page: paragraph.pageNumber,
         start: paragraph.startPosition,
-        end: paragraph.endPosition
+        end: paragraph.endPosition,
       },
       paragraph.confidence,
       {
         properties: {
           lineCount: paragraph.lineCount,
-          confidence: paragraph.confidence
-        }
+          confidence: paragraph.confidence,
+        },
       }
     );
   }
@@ -228,9 +273,13 @@ export class GraphBuilder {
   /**
    * Create a fallback paragraph when no paragraphs are detected
    */
-  private static createFallbackParagraph(page: PDFParseResult['pages'][0]): ReturnType<typeof GraphFactory.createParagraphNode> {
+  private static createFallbackParagraph(
+    page: PDFParseResult['pages'][0]
+  ): ReturnType<typeof GraphFactory.createParagraphNode> {
     // Split page content into reasonable paragraphs
-    const lines = page.content.split('\n').filter(line => line.trim().length > 0);
+    const lines = page.content
+      .split('\n')
+      .filter((line) => line.trim().length > 0);
     const content = lines.join(' ').trim();
 
     if (content.length === 0) {
@@ -240,7 +289,7 @@ export class GraphBuilder {
         {
           page: page.pageNumber,
           start: 0,
-          end: '[Empty page]'.length
+          end: '[Empty page]'.length,
         },
         0.1
       );
@@ -251,14 +300,14 @@ export class GraphBuilder {
       {
         page: page.pageNumber,
         start: 0,
-        end: content.length
+        end: content.length,
       },
       0.5, // Lower confidence for fallback
       {
         properties: {
           fallback: true,
-          originalLines: lines.length
-        }
+          originalLines: lines.length,
+        },
       }
     );
   }
@@ -274,7 +323,7 @@ export class GraphBuilder {
     if (!textElements) return;
 
     // Look for potential headings (large, bold text at start of lines)
-    const potentialHeadings = textElements.filter(element => {
+    const potentialHeadings = textElements.filter((element) => {
       // Simple heuristics for headings
       const isLargeText = (element.height || 12) > 14; // Assuming 12pt is normal
       const startsLine = element.y && Math.abs(element.y % 14) < 2; // Near line start
@@ -297,22 +346,25 @@ export class GraphBuilder {
             x: heading.x || 0,
             y: heading.y || 0,
             width: heading.width || 0,
-            height: heading.height || 12
-          }
+            height: heading.height || 12,
+          },
         },
         0.7, // Moderate confidence for detected headings
         {
           font: {
             family: 'Unknown',
-            size: heading.height || 12
-          }
+            size: heading.height || 12,
+          },
         }
       );
 
       graph.addNode(sectionNode);
 
       // Connect page to section
-      const pageToSectionEdge = GraphFactory.createContainsEdge(pageNodeId, sectionNode.id);
+      const pageToSectionEdge = GraphFactory.createContainsEdge(
+        pageNodeId,
+        sectionNode.id
+      );
       graph.addEdge(pageToSectionEdge);
     }
   }
@@ -359,9 +411,10 @@ export class GraphBuilder {
     // For each section, find paragraphs that likely belong to it
     for (const section of sectionNodes) {
       // Find paragraphs on the same page that come after this section
-      const samePageParagraphs = paragraphNodes.filter(para =>
-        para.position.page === section.position.page &&
-        para.position.start > section.position.start
+      const samePageParagraphs = paragraphNodes.filter(
+        (para) =>
+          para.position.page === section.position.page &&
+          para.position.start > section.position.start
       );
 
       // Connect section to its paragraphs (limit to first few to avoid over-connection)
@@ -388,13 +441,17 @@ export class GraphBuilder {
     pageContainerNodeId: string
   ): void {
     // Filter tables for this page
-    const pageTables = tables.filter(table => table.pageNumber === pageNumber);
+    const pageTables = tables.filter(
+      (table) => table.pageNumber === pageNumber
+    );
 
     if (pageTables.length === 0) {
       return;
     }
 
-    logger.debug(`Processing ${pageTables.length} tables on page ${pageNumber}`);
+    logger.debug(
+      `Processing ${pageTables.length} tables on page ${pageNumber}`
+    );
 
     for (const table of pageTables) {
       try {
@@ -403,13 +460,20 @@ export class GraphBuilder {
         graph.addNode(tableNode);
 
         // Connect page to table
-        const pageToTableEdge = GraphFactory.createContainsEdge(pageContainerNodeId, tableNode.id);
+        const pageToTableEdge = GraphFactory.createContainsEdge(
+          pageContainerNodeId,
+          tableNode.id
+        );
         graph.addEdge(pageToTableEdge);
 
-        logger.debug(`Created table node: ${tableNode.id} (${table.data.rows.length}x${table.data.rows[0]?.length || 0})`);
-
+        logger.debug(
+          `Created table node: ${tableNode.id} (${table.data.rows.length}x${table.data.rows[0]?.length || 0})`
+        );
       } catch (error) {
-        logger.warn(`Failed to create table node for table ${table.id}:`, error);
+        logger.warn(
+          `Failed to create table node for table ${table.id}:`,
+          error
+        );
       }
     }
   }
@@ -424,13 +488,17 @@ export class GraphBuilder {
     pageContainerNodeId: string
   ): void {
     // Filter images for this page
-    const pageImages = images.filter(image => image.pageNumber === pageNumber);
+    const pageImages = images.filter(
+      (image) => image.pageNumber === pageNumber
+    );
 
     if (pageImages.length === 0) {
       return;
     }
 
-    logger.debug(`Processing ${pageImages.length} images on page ${pageNumber}`);
+    logger.debug(
+      `Processing ${pageImages.length} images on page ${pageNumber}`
+    );
 
     for (const image of pageImages) {
       try {
@@ -439,13 +507,20 @@ export class GraphBuilder {
         graph.addNode(imageNode);
 
         // Connect page to image
-        const pageToImageEdge = GraphFactory.createContainsEdge(pageContainerNodeId, imageNode.id);
+        const pageToImageEdge = GraphFactory.createContainsEdge(
+          pageContainerNodeId,
+          imageNode.id
+        );
         graph.addEdge(pageToImageEdge);
 
-        logger.debug(`Created image node: ${imageNode.id} (${image.width}x${image.height}, ${image.format})`);
-
+        logger.debug(
+          `Created image node: ${imageNode.id} (${image.width}x${image.height}, ${image.format})`
+        );
       } catch (error) {
-        logger.warn(`Failed to create image node for image ${image.id}:`, error);
+        logger.warn(
+          `Failed to create image node for image ${image.id}:`,
+          error
+        );
       }
     }
   }
@@ -453,7 +528,9 @@ export class GraphBuilder {
   /**
    * Create a table node from extracted table data
    */
-  private static createTableNode(table: ExtractedTable): ReturnType<typeof GraphFactory.createTableNode> {
+  private static createTableNode(
+    table: ExtractedTable
+  ): ReturnType<typeof GraphFactory.createTableNode> {
     const rowCount = table.data.rows.length;
     const colCount = table.data.rows[0]?.length || 0;
 
@@ -461,7 +538,7 @@ export class GraphBuilder {
     const position = {
       page: table.pageNumber,
       start: 0, // Would need better positioning logic
-      end: table.data.rawText.length
+      end: table.data.rawText.length,
     };
 
     // Create metadata with table-specific properties
@@ -472,8 +549,8 @@ export class GraphBuilder {
         extractionMethod: table.method,
         headers: table.data.headers,
         bbox: table.bbox,
-        rawText: table.data.rawText
-      }
+        rawText: table.data.rawText,
+      },
     };
 
     return GraphFactory.createTableNode(
@@ -489,16 +566,20 @@ export class GraphBuilder {
   /**
    * Create an image node from extracted image data
    */
-  private static createImageNode(image: ExtractedImage): ReturnType<typeof GraphFactory.createImageNode> {
+  private static createImageNode(
+    image: ExtractedImage
+  ): ReturnType<typeof GraphFactory.createImageNode> {
     // Create position info for the image
     const position = {
       page: image.pageNumber,
       start: image.imageNumber * 1000, // Estimate position based on image order
-      end: (image.imageNumber + 1) * 1000
+      end: (image.imageNumber + 1) * 1000,
     };
 
     // Create alt text from filename or generate generic one
-    const altText = image.fileName || `Image ${image.imageNumber + 1} on page ${image.pageNumber}`;
+    const altText =
+      image.fileName ||
+      `Image ${image.imageNumber + 1} on page ${image.pageNumber}`;
 
     // Create metadata with image-specific properties
     const metadata = {
@@ -517,9 +598,9 @@ export class GraphBuilder {
         mimeType: image.metadata?.mimeType,
         colorSpace: image.metadata?.colorSpace,
         hasAlpha: image.metadata?.hasAlpha,
-        compression: image.metadata?.compression
+        compression: image.metadata?.compression,
       },
-      ...image.metadata
+      ...image.metadata,
     };
 
     return GraphFactory.createImageNode(
@@ -534,7 +615,9 @@ export class GraphBuilder {
   /**
    * Detect references in text nodes and create reference edges
    */
-  private static async detectAndCreateReferenceEdges(graph: Graph): Promise<void> {
+  private static async detectAndCreateReferenceEdges(
+    graph: Graph
+  ): Promise<void> {
     logger.info('Starting reference detection and edge creation');
 
     const startTime = Date.now();
@@ -542,7 +625,8 @@ export class GraphBuilder {
     let totalEdgesCreated = 0;
 
     // Get all text nodes that might contain references
-    const textNodes = graph.getNodesByType('paragraph')
+    const textNodes = graph
+      .getNodesByType('paragraph')
       .concat(graph.getNodesByType('section'))
       .concat(graph.getNodesByType('metadata'));
 
@@ -552,7 +636,8 @@ export class GraphBuilder {
     for (const sourceNode of textNodes) {
       try {
         // Detect references in this node
-        const analysis = await ReferenceDetectionService.analyzeNode(sourceNode);
+        const analysis =
+          await ReferenceDetectionService.analyzeNode(sourceNode);
 
         if (analysis.references.length === 0) {
           continue; // No references found
@@ -560,7 +645,9 @@ export class GraphBuilder {
 
         totalReferencesDetected += analysis.references.length;
 
-        logger.debug(`Found ${analysis.references.length} references in node ${sourceNode.id}`);
+        logger.debug(
+          `Found ${analysis.references.length} references in node ${sourceNode.id}`
+        );
 
         // Create resolution context
         const context: ResolutionContext = {
@@ -568,12 +655,15 @@ export class GraphBuilder {
           sourceNode,
           context: {
             documentStructure: {
-              totalPages: graph.nodes.reduce((max, node) => Math.max(max, node.position.page), 0),
+              totalPages: graph.nodes.reduce(
+                (max, node) => Math.max(max, node.position.page),
+                0
+              ),
               sections: graph.getNodesByType('section'),
               figures: graph.getNodesByType('image'),
-              tables: graph.getNodesByType('table')
-            }
-          }
+              tables: graph.getNodesByType('table'),
+            },
+          },
         };
 
         // Resolve each reference
@@ -584,7 +674,8 @@ export class GraphBuilder {
 
         // Create edges for successful resolutions
         for (const resolution of resolutions) {
-          if (resolution.targetNode && resolution.confidence > 0.4) { // Minimum confidence threshold
+          if (resolution.targetNode && resolution.confidence > 0.4) {
+            // Minimum confidence threshold
             const referenceEdge = GraphFactory.createReferencesEdge(
               sourceNode.id,
               resolution.targetNode.id,
@@ -595,21 +686,29 @@ export class GraphBuilder {
             graph.addEdge(referenceEdge);
             totalEdgesCreated++;
 
-            logger.debug(`Created reference edge: ${sourceNode.id} -> ${resolution.targetNode.id}`, {
-              reference: resolution.reference.text,
-              confidence: resolution.confidence,
-              reason: resolution.reason
-            });
+            logger.debug(
+              `Created reference edge: ${sourceNode.id} -> ${resolution.targetNode.id}`,
+              {
+                reference: resolution.reference.text,
+                confidence: resolution.confidence,
+                reason: resolution.reason,
+              }
+            );
           } else {
-            logger.debug(`Reference not resolved: ${resolution.reference.text}`, {
-              confidence: resolution.confidence,
-              reason: resolution.reason
-            });
+            logger.debug(
+              `Reference not resolved: ${resolution.reference.text}`,
+              {
+                confidence: resolution.confidence,
+                reason: resolution.reason,
+              }
+            );
           }
         }
-
       } catch (error) {
-        logger.warn(`Failed to process references for node ${sourceNode.id}:`, error);
+        logger.warn(
+          `Failed to process references for node ${sourceNode.id}:`,
+          error
+        );
       }
     }
 
@@ -617,7 +716,7 @@ export class GraphBuilder {
     logger.info('Reference detection and edge creation completed', {
       totalReferencesDetected,
       totalEdgesCreated,
-      processingTimeMs: processingTime
+      processingTimeMs: processingTime,
     });
   }
 
@@ -640,7 +739,7 @@ export class GraphBuilder {
       edgesByType: graph.statistics.edgesByType,
       averageDegree: graph.statistics.averageDegree,
       maxDegree: graph.statistics.maxDegree,
-      connectedComponents: graph.statistics.components
+      connectedComponents: graph.statistics.components,
     };
   }
 }

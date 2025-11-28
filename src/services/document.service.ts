@@ -8,7 +8,7 @@ import {
   Document,
   DocumentStatus,
   CreateDocumentInput,
-  UpdateDocumentInput
+  UpdateDocumentInput,
 } from '../models';
 import { logger } from '../utils/logger';
 import { AppError } from '../utils/errors';
@@ -39,7 +39,7 @@ export class DocumentService {
       logger.info('Creating document record', {
         filename: input.filename,
         fileSize: input.file_size,
-        userId: input.user_id
+        userId: input.user_id,
       });
 
       const id = uuidv4();
@@ -54,7 +54,7 @@ export class DocumentService {
         pdf_url: input.pdf_url,
         metadata: input.metadata || {},
         created_at: now,
-        updated_at: now
+        updated_at: now,
       };
 
       const query = `
@@ -73,7 +73,7 @@ export class DocumentService {
         document.pdf_url,
         JSON.stringify(document.metadata),
         document.created_at,
-        document.updated_at
+        document.updated_at,
       ];
 
       const result = await db.query(query, values);
@@ -86,14 +86,14 @@ export class DocumentService {
 
       logger.info('Document record created', {
         id: createdDoc.id,
-        filename: createdDoc.filename
+        filename: createdDoc.filename,
       });
 
       return createdDoc;
     } catch (error: any) {
       logger.error('Failed to create document', {
         error: error.message,
-        filename: input.filename
+        filename: input.filename,
       });
 
       if (error instanceof AppError) {
@@ -101,7 +101,7 @@ export class DocumentService {
       }
 
       throw new AppError('Database error while creating document', 500, {
-        originalError: error.message
+        originalError: error.message,
       });
     }
   }
@@ -109,7 +109,10 @@ export class DocumentService {
   /**
    * Get document by ID
    */
-  public async getDocumentById(id: string, userId?: string): Promise<Document | null> {
+  public async getDocumentById(
+    id: string,
+    userId?: string
+  ): Promise<Document | null> {
     try {
       let query = 'SELECT * FROM documents WHERE id = $1';
       const values: any[] = [id];
@@ -130,7 +133,7 @@ export class DocumentService {
     } catch (error: any) {
       logger.error('Failed to get document by ID', {
         id,
-        error: error.message
+        error: error.message,
       });
       throw new AppError('Database error while fetching document', 500);
     }
@@ -151,7 +154,7 @@ export class DocumentService {
         limit = 20,
         offset = 0,
         orderBy = 'created_at',
-        orderDirection = 'desc'
+        orderDirection = 'desc',
       } = options;
 
       // Build WHERE clause
@@ -169,9 +172,10 @@ export class DocumentService {
         values.push(status);
       }
 
-      const whereClause = whereConditions.length > 0
-        ? `WHERE ${whereConditions.join(' AND ')}`
-        : '';
+      const whereClause =
+        whereConditions.length > 0
+          ? `WHERE ${whereConditions.join(' AND ')}`
+          : '';
 
       // Get total count
       const countQuery = `SELECT COUNT(*) as total FROM documents ${whereClause}`;
@@ -189,18 +193,18 @@ export class DocumentService {
       values.push(limit, offset);
       const result = await db.query(selectQuery, values);
 
-      const documents = result.rows.map(row => this.mapRowToDocument(row));
+      const documents = result.rows.map((row) => this.mapRowToDocument(row));
       const hasMore = offset + limit < total;
 
       return {
         documents,
         total,
-        hasMore
+        hasMore,
       };
     } catch (error: any) {
       logger.error('Failed to get documents', {
         options,
-        error: error.message
+        error: error.message,
       });
       throw new AppError('Database error while fetching documents', 500);
     }
@@ -278,7 +282,7 @@ export class DocumentService {
         id,
         status: updatedDoc.status,
         hasGraph: !!updatedDoc.graph_data,
-        hasSummary: !!updatedDoc.summary
+        hasSummary: !!updatedDoc.summary,
       });
 
       return updatedDoc;
@@ -286,7 +290,7 @@ export class DocumentService {
       logger.error('Failed to update document', {
         id,
         updates,
-        error: error.message
+        error: error.message,
       });
 
       if (error instanceof AppError) {
@@ -326,7 +330,7 @@ export class DocumentService {
     } catch (error: any) {
       logger.error('Failed to delete document', {
         id,
-        error: error.message
+        error: error.message,
       });
       throw new AppError('Database error while deleting document', 500);
     }
@@ -358,14 +362,17 @@ export class DocumentService {
         pending: 0,
         processing: 0,
         completed: 0,
-        failed: 0
+        failed: 0,
       };
 
-      statusResult.rows.forEach(row => {
+      statusResult.rows.forEach((row) => {
         byStatus[row.status as DocumentStatus] = parseInt(row.count);
       });
 
-      const total = Object.values(byStatus).reduce((sum, count) => sum + count, 0);
+      const total = Object.values(byStatus).reduce(
+        (sum, count) => sum + count,
+        0
+      );
 
       // Get total file size
       const sizeQuery = `
@@ -392,12 +399,12 @@ export class DocumentService {
         total,
         byStatus,
         totalSize,
-        recentUploads
+        recentUploads,
       };
     } catch (error: any) {
       logger.error('Failed to get document stats', {
         userId,
-        error: error.message
+        error: error.message,
       });
       throw new AppError('Database error while fetching statistics', 500);
     }
@@ -458,7 +465,7 @@ export class DocumentService {
       summary: row.summary,
       metadata: row.metadata || {},
       created_at: new Date(row.created_at),
-      updated_at: new Date(row.updated_at)
+      updated_at: new Date(row.updated_at),
     };
   }
 

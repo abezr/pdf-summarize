@@ -4,14 +4,14 @@
  */
 
 export type NodeType =
-  | 'document'      // Root document node
-  | 'section'       // Document section (heading)
-  | 'paragraph'     // Text paragraph
-  | 'table'         // Table content
-  | 'image'         // Image reference
-  | 'list'          // List or enumeration
-  | 'code'          // Code block
-  | 'metadata';     // Document metadata
+  | 'document' // Root document node
+  | 'section' // Document section (heading)
+  | 'paragraph' // Text paragraph
+  | 'table' // Table content
+  | 'image' // Image reference
+  | 'list' // List or enumeration
+  | 'code' // Code block
+  | 'metadata'; // Document metadata
 
 export const NODE_TYPES: readonly NodeType[] = [
   'document',
@@ -21,18 +21,18 @@ export const NODE_TYPES: readonly NodeType[] = [
   'image',
   'list',
   'code',
-  'metadata'
+  'metadata',
 ] as const;
 
 export type EdgeType =
-  | 'contains'      // Hierarchical containment (document → section, section → paragraph)
-  | 'references'    // Cross-reference between elements
-  | 'follows'       // Sequential order (paragraph1 → paragraph2)
-  | 'similar'       // Semantic similarity between content
-  | 'parent'        // Parent-child relationship
-  | 'child'         // Child-parent relationship
-  | 'next'          // Sequential next element
-  | 'previous';     // Sequential previous element
+  | 'contains' // Hierarchical containment (document → section, section → paragraph)
+  | 'references' // Cross-reference between elements
+  | 'follows' // Sequential order (paragraph1 → paragraph2)
+  | 'similar' // Semantic similarity between content
+  | 'parent' // Parent-child relationship
+  | 'child' // Child-parent relationship
+  | 'next' // Sequential next element
+  | 'previous'; // Sequential previous element
 
 export const EDGE_TYPES: readonly EdgeType[] = [
   'contains',
@@ -42,7 +42,7 @@ export const EDGE_TYPES: readonly EdgeType[] = [
   'parent',
   'child',
   'next',
-  'previous'
+  'previous',
 ] as const;
 
 export interface Position {

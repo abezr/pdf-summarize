@@ -17,6 +17,260 @@ A sophisticated **document-aware PDF summarization system** that treats document
 
 ---
 
+## 🚀 Installation & Quick Setup
+
+### Prerequisites
+
+- **Node.js**: v20+ (LTS recommended)
+- **npm**: v9+ or **yarn**: v1.22+
+- **Git**: For cloning the repository
+- **API Keys**: At least one of:
+  - OpenAI API key ([Get here](https://platform.openai.com/api-keys))
+  - Google AI API key ([Get here](https://makersuite.google.com/app/apikey))
+
+### Option 1: Quick Start (5 minutes)
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/abezr/pdf-summarize.git
+cd pdf-summarize
+
+# 2. Install dependencies
+npm install
+
+# 3. Configure environment variables
+cp .env.example .env
+
+# 4. Edit .env and add your API key(s)
+# Required: Add at least ONE of the following:
+#   OPENAI_API_KEY=sk-your-openai-key-here
+#   GOOGLE_API_KEY=your-google-ai-key-here
+
+# 5. Start development server
+npm run dev
+```
+
+**That's it!** The system will:
+- ✅ Auto-detect which LLM provider(s) are available
+- ✅ Enable quota management for Google AI (if configured)
+- ✅ Select optimal models based on task purpose
+- ✅ Provide fallback if primary provider fails
+
+### Option 2: Docker Setup (Recommended for Production)
+
+```bash
+# 1. Clone and configure
+git clone https://github.com/abezr/pdf-summarize.git
+cd pdf-summarize
+cp .env.example .env
+# Edit .env with your API keys
+
+# 2. Build and run with Docker Compose
+docker-compose up -d
+
+# 3. Access the application
+# Frontend: http://localhost:3000
+# API: http://localhost:3000/api
+# Metrics: http://localhost:9090 (Prometheus)
+# Dashboards: http://localhost:3001 (Grafana)
+```
+
+### Environment Configuration
+
+#### Minimal Configuration (Google AI Only - Recommended)
+
+```bash
+# .env - Just 3 lines!
+NODE_ENV=development
+GOOGLE_API_KEY=your-google-ai-key-here
+GOOGLE_QUOTA_MANAGEMENT=true        # Enables dynamic model selection
+```
+
+**Why Google AI?**
+- ✅ **FREE**: Generous free tier (1M tokens/day)
+- ✅ **97% Cheaper**: vs OpenAI GPT-4o
+- ✅ **Auto-Selection**: Intelligent model selection based on task
+- ✅ **No Setup**: Works out of the box
+
+#### Full Configuration (Both Providers)
+
+```bash
+# .env
+NODE_ENV=development
+PORT=3000
+
+# LLM Provider Configuration
+LLM_PROVIDER=auto                    # Options: auto, openai, google
+LLM_ENABLE_FALLBACK=true            # Enable automatic fallback
+
+# OpenAI (Optional)
+OPENAI_API_KEY=sk-your-openai-key-here
+OPENAI_MODEL=gpt-4o                 # Options: gpt-4o, gpt-4, gpt-3.5-turbo
+
+# Google AI (Recommended)
+GOOGLE_API_KEY=your-google-ai-key-here
+GOOGLE_QUOTA_MANAGEMENT=true        # Enable dynamic quota management
+GOOGLE_DAILY_QUOTA=1000000          # 1M tokens/day (default)
+
+# Database (Optional - uses SQLite by default for local-first)
+# DB_HOST=localhost
+# DB_PORT=5432
+# DB_NAME=pdf_summary_db
+
+# Redis (Optional - uses node-cache by default for local-first)
+# REDIS_HOST=localhost
+# REDIS_PORT=6379
+
+# File Storage (Uses local filesystem by default)
+UPLOAD_DIR=./uploads
+MAX_FILE_SIZE=52428800              # 50MB
+
+# OCR Configuration
+OCR_ENABLED=true
+OCR_PROVIDER=tesseract              # Options: tesseract (free), vision (paid)
+
+# Observability (Optional)
+METRICS_ENABLED=true
+LOG_LEVEL=info
+```
+
+### Verify Installation
+
+```bash
+# Check if the server is running
+curl http://localhost:3000/api/health
+
+# Expected response:
+# {
+#   "status": "ok",
+#   "providers": {
+#     "openai": true,    # or false if not configured
+#     "google": true     # or false if not configured
+#   },
+#   "quotaManagement": true
+# }
+```
+
+### Test LLM Providers
+
+```bash
+# Test Google AI provider
+curl -X POST http://localhost:3000/api/llm/test \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "google", "message": "Hello, world!"}'
+
+# Check quota status (Google AI)
+curl http://localhost:3000/api/llm/quota-status
+```
+
+### Quick Test - Upload & Summarize
+
+```bash
+# Upload a PDF and get summary
+curl -X POST http://localhost:3000/api/upload \
+  -F "file=@sample.pdf" \
+  -F "summarize=true"
+```
+
+### NPM Scripts
+
+```bash
+# Development
+npm run dev              # Start dev server with hot reload
+npm run build           # Build for production
+npm run start           # Start production server
+
+# Testing
+npm test                # Run all tests
+npm run test:watch      # Run tests in watch mode
+npm run test:coverage   # Generate coverage report
+
+# Code Quality
+npm run lint            # Run ESLint
+npm run format          # Format code with Prettier
+npm run type-check      # TypeScript type checking
+
+# Docker
+npm run docker:build    # Build Docker image
+npm run docker:up       # Start with Docker Compose
+npm run docker:down     # Stop Docker containers
+```
+
+### Troubleshooting
+
+#### Issue: "No LLM providers available"
+**Solution**: Add at least one API key to `.env`:
+```bash
+# Add either:
+OPENAI_API_KEY=sk-your-key-here
+# OR
+GOOGLE_API_KEY=your-key-here
+```
+
+#### Issue: "Quota exceeded" errors
+**Solution**: 
+1. Check quota status: `curl http://localhost:3000/api/llm/quota-status`
+2. Wait for daily reset (midnight Pacific Time)
+3. Or increase daily budget: `GOOGLE_DAILY_QUOTA=2000000`
+
+#### Issue: Port already in use
+**Solution**: Change port in `.env`:
+```bash
+PORT=3001  # Use different port
+```
+
+#### Issue: PDF upload fails
+**Solution**: Check file size limit:
+```bash
+MAX_FILE_SIZE=104857600  # Increase to 100MB
+```
+
+### Getting API Keys
+
+#### Google AI API Key (Recommended - FREE)
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Click "Get API Key"
+3. Create new API key (or use existing)
+4. Copy key to `.env` as `GOOGLE_API_KEY`
+
+**Free Tier**: 
+- 1,500 requests/day for Gemini Flash models
+- 50 requests/day for Gemini Pro
+- 1M-4M tokens/minute depending on model
+- **No credit card required**
+
+#### OpenAI API Key (Optional - Paid)
+1. Go to [OpenAI Platform](https://platform.openai.com/api-keys)
+2. Click "Create new secret key"
+3. Copy key to `.env` as `OPENAI_API_KEY`
+
+**Pricing**: 
+- GPT-4o: $0.005 input / $0.015 output per 1K tokens
+- GPT-3.5-turbo: $0.0005 input / $0.0015 output per 1K tokens
+- **Credit card required**
+
+### Cost Comparison
+
+| Provider | Model | Cost (per 1K tokens) | Free Tier |
+|----------|-------|---------------------|-----------|
+| **Google AI** | Gemini 1.5 Flash-8B | $0.0000375 | ✅ 1,500 RPD |
+| **Google AI** | Gemini 1.5 Flash | $0.000075 | ✅ 1,500 RPD |
+| **Google AI** | Gemini 1.5 Pro | $0.00125 | ✅ 50 RPD |
+| OpenAI | GPT-3.5-turbo | $0.001 | ❌ Paid only |
+| OpenAI | GPT-4o | $0.01 | ❌ Paid only |
+
+**Recommendation**: Start with Google AI (FREE) for development and testing!
+
+### Next Steps
+
+1. 📖 Read the [Quick Reference Guide](./docs/guides/QUICK-REFERENCE.md)
+2. 🤖 Explore [Multi-LLM Documentation](./docs/llm/MULTI-LLM-QUICKSTART.md)
+3. 🎯 Check [Quota Management Guide](./docs/llm/QUOTA-MANAGEMENT.md)
+4. 🏗️ Review [Architecture Diagrams](./docs/architecture/ARCHITECTURE-DIAGRAMS.md)
+5. 💻 Start building with [Implementation Guide](./docs/implementation/IMPLEMENTATION-GUIDE.md)
+
+---
+
 ## 📚 Documentation Structure
 
 **NEW**: Documentation is now organized into logical folders for better navigation!
@@ -62,7 +316,12 @@ src/
         └── README.md                 # Developer guide
 ```
 
-**Total**: 19 comprehensive documents (18 `.md` + 811 lines of TypeScript code) totaling **9,600+ lines** and **85,000+ words** of documentation, plus complete working code implementation.
+**Total**: 20 comprehensive documents (19 `.md` + 1,282 lines of TypeScript code) totaling **10,500+ lines** and **95,000+ words** of documentation, plus complete working code implementation with **dynamic quota management**.
+
+**Quick Links**:
+- 🚀 [Installation & Quick Setup](#-installation--quick-setup) - Get started in 5 minutes
+- 🤖 [For AI/LLM Agents](#-for-aillm-agents) - AI agent integration guide
+- 📖 [Documentation by Category](#-documentation-by-category) - Complete docs index
 
 ---
 
@@ -175,18 +434,20 @@ This document provides:
 | [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md) | 1,109 | Complete architecture specification |
 | [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) | 513 | 5-minute quick start guide |
 | [`docs/llm/MULTI-LLM-IMPLEMENTATION-SUMMARY.md`](./docs/llm/MULTI-LLM-IMPLEMENTATION-SUMMARY.md) | 477 | Implementation verification |
+| [`docs/llm/QUOTA-MANAGEMENT.md`](./docs/llm/QUOTA-MANAGEMENT.md) | 561 | Dynamic quota management guide (NEW) |
 | [`src/services/llm/README.md`](./src/services/llm/README.md) | 350 | Developer documentation |
 
 **Plus Working Code**:
 - `src/services/llm/ILLMProvider.ts` (81 lines)
 - `src/services/llm/OpenAIProvider.ts` (184 lines)
-- `src/services/llm/GoogleProvider.ts` (247 lines)
+- `src/services/llm/GoogleProvider.ts` (390 lines) ⭐ +157 lines
+- `src/services/llm/QuotaManager.ts` (361 lines) ⭐ **NEW**
 - `src/services/llm/LLMProviderManager.ts` (238 lines)
-- `src/services/llm/index.ts` (21 lines)
+- `src/services/llm/index.ts` (31 lines)
 - `src/utils/logger.ts` (22 lines)
 - `src/utils/errors.ts` (18 lines)
 
-**Total**: 2,449 lines docs + 811 lines code = **3,260 lines**
+**Total**: 3,010 lines docs + 1,325 lines code = **4,335 lines**
 
 ---
 

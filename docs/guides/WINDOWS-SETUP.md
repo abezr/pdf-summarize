@@ -115,9 +115,16 @@ npm run migrate:down        :: Rollback migrations
 npm run docker:dev
 ```
 
-### Issue 2: Docker Desktop not starting
+### Issue 2: Docker Desktop not running or installed
 
-**Cause**: WSL 2 not enabled or Hyper-V issues
+**Quick Check**: Run diagnostic script:
+```cmd
+scripts\check-docker.cmd
+```
+
+This will tell you exactly what's wrong.
+
+**Cause**: Docker Desktop not installed, not running, or WSL 2 not enabled
 
 **Solutions**:
 

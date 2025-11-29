@@ -7,10 +7,11 @@ This document contains Mermaid diagrams for the document-aware PDF Summary AI sy
 1. [System Context Diagram](#system-context-diagram)
 2. [Container Architecture Diagram](#container-architecture-diagram)
 3. [Processing Pipeline Flow](#processing-pipeline-flow)
-4. [Knowledge Graph Structure](#knowledge-graph-structure)
-5. [MCP Context Retrieval](#mcp-context-retrieval)
-6. [Evaluation & Observability Flow](#evaluation--observability-flow)
-7. [Data Flow Diagram](#data-flow-diagram)
+4. [Google Gemini Quota Management Flow](#google-gemini-quota-management-flow-new) ⭐ **NEW**
+5. [Knowledge Graph Structure](#knowledge-graph-structure)
+6. [MCP Context Retrieval](#mcp-context-retrieval)
+7. [Evaluation & Observability Flow](#evaluation--observability-flow)
+8. [Data Flow Diagram](#data-flow-diagram)
 
 ---
 
@@ -24,17 +25,17 @@ graph TB
         System[PDF Summary AI<br/>Knowledge Graph-Based<br/>Document Processing]
     end
     
-    OpenAI[🤖 OpenAI API<br/>GPT-4o]
-    GCP[☁️ GCP Vertex AI<br/>Gemini 1.5 Pro]
+    OpenAI[🤖 OpenAI API<br/>GPT-4o, GPT-4, GPT-3.5]
+    GoogleAI[🧠 Google AI<br/>Multi-Model + Quota Mgmt<br/>flash-8b, flash, pro, 2.0-exp]
     PostgreSQL[(🗄️ PostgreSQL<br/>Document Metadata)]
     Redis[(⚡ Redis<br/>Graph Cache)]
     S3[(📦 S3/GCS<br/>PDF Storage)]
-    Prometheus[📊 Prometheus<br/>Metrics]
+    Prometheus[📊 Prometheus<br/>Metrics + Quota Status]
     Grafana[📈 Grafana<br/>Dashboards]
     
     User -->|Upload PDF<br/>View Summaries| System
     System -->|LLM Requests| OpenAI
-    System -->|LLM Requests<br/>Fallback| GCP
+    System -->|LLM Requests<br/>Quota-Managed<br/>Auto-Fallback| GoogleAI
     System -->|Store Metadata<br/>Query History| PostgreSQL
     System -->|Cache Graph<br/>Embeddings| Redis
     System -->|Upload/Download<br/>PDFs| S3
@@ -45,7 +46,7 @@ graph TB
     style System fill:#4CAF50,stroke:#2E7D32,stroke-width:3px,color:#fff
     style User fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
     style OpenAI fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
-    style GCP fill:#FF5722,stroke:#BF360C,stroke-width:2px,color:#fff
+    style GoogleAI fill:#9C27B0,stroke:#6A1B9A,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -136,9 +137,16 @@ flowchart TD
     
     MCPSetup --> PromptEngineer[📝 Prompt Engineering<br/>System: Grounding instructions<br/>Context: Document clusters]
     
-    PromptEngineer --> LLMCall[🤖 LLM Call<br/>GPT-4o / Gemini 1.5 Pro<br/>Function Calling Enabled]
+    PromptEngineer --> QuotaCheck{Quota<br/>Management<br/>Enabled?}
     
-    LLMCall --> ToolCall{Tool Call<br/>Requested?}
+    QuotaCheck -->|Yes| DetectPurpose[🎯 Detect Task Purpose<br/>6 types: bulk/quick/standard<br/>detailed/vision/critical]
+    DetectPurpose --> SelectModel[🔄 Select Model<br/>Check quota availability<br/>Choose from: flash-8b, flash<br/>pro, 2.0-exp]
+    SelectModel --> LLMCall[🤖 LLM Call<br/>Selected Model<br/>Function Calling Enabled]
+    
+    QuotaCheck -->|No| LLMCall
+    
+    LLMCall --> RecordUsage[📊 Record Token Usage<br/>Update daily quota<br/>Check thresholds]
+    RecordUsage --> ToolCall{Tool Call<br/>Requested?}
     
     ToolCall -->|Yes| MCPRetrieve[🔎 MCP Retrieve Context<br/>Get neighborhood<br/>depth=1]
     MCPRetrieve --> InjectContext[💉 Inject Context<br/>Add related nodes]
@@ -163,6 +171,88 @@ flowchart TD
     style Evaluate fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
     style End fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
 ```
+
+---
+
+## Google Gemini Quota Management Flow (NEW)
+
+```mermaid
+flowchart TD
+    Start([LLM Request]) --> CheckReset{Daily Reset<br/>Needed?}
+    
+    CheckReset -->|Yes<br/>Past Midnight PT| ResetQuotas[🔄 Reset All Quotas<br/>tokens = 0<br/>requests = 0]
+    CheckReset -->|No| DetectPurpose
+    ResetQuotas --> DetectPurpose
+    
+    DetectPurpose[🎯 Detect Task Purpose<br/>Analyze: keywords + length]
+    
+    DetectPurpose --> Purpose{Purpose<br/>Type?}
+    
+    Purpose -->|bulk-processing| RecoBulk["📋 Recommend:<br/>1. flash-8b (4M TPM)<br/>2. 2.0-flash-exp (4M TPM)<br/>3. flash (1M TPM)"]
+    Purpose -->|quick-summary| RecoQuick["⚡ Recommend:<br/>1. 2.0-flash-exp (FREE)<br/>2. flash (1M TPM)<br/>3. flash-8b (4M TPM)"]
+    Purpose -->|standard-analysis| RecoStandard["📝 Recommend:<br/>1. flash (1M TPM)<br/>2. 2.0-flash-exp<br/>3. pro (32K TPM)"]
+    Purpose -->|detailed-analysis| RecoDetailed["🔬 Recommend:<br/>1. pro (32K TPM)<br/>2. exp-1206 (32K TPM)<br/>3. flash (1M TPM)"]
+    Purpose -->|vision-analysis| RecoVision["👁️ Recommend:<br/>1. flash (vision)<br/>2. pro (vision)<br/>3. 2.0-flash-exp"]
+    Purpose -->|critical-task| RecoCritical["⚠️ Recommend:<br/>1. pro (best quality)<br/>2. exp-1206<br/>3. flash"]
+    
+    RecoBulk --> CheckQuota
+    RecoQuick --> CheckQuota
+    RecoStandard --> CheckQuota
+    RecoDetailed --> CheckQuota
+    RecoVision --> CheckQuota
+    RecoCritical --> CheckQuota
+    
+    CheckQuota{Check Each<br/>Recommended<br/>Model}
+    
+    CheckQuota --> RPDCheck{RPD Limit<br/>Exceeded?}
+    RPDCheck -->|Yes| NextModel[Try Next<br/>Recommended Model]
+    RPDCheck -->|No| BudgetCheck
+    
+    BudgetCheck{Daily Budget<br/>Exceeded?}
+    BudgetCheck -->|Yes| NextModel
+    BudgetCheck -->|No| Selected[✅ Model Selected]
+    
+    NextModel --> MoreModels{More<br/>Recommended<br/>Models?}
+    MoreModels -->|Yes| CheckQuota
+    MoreModels -->|No| AnyAvailable{Any Model<br/>Available?}
+    
+    AnyAvailable -->|Yes| FallbackModel[⚠️ Use Fallback Model<br/>Any available model]
+    AnyAvailable -->|No| QuotaError[❌ 429 Error<br/>All models exhausted<br/>Next reset: midnight PT]
+    
+    FallbackModel --> Selected
+    
+    Selected --> MakeLLMCall[🤖 Make LLM Call<br/>Selected Model]
+    
+    MakeLLMCall --> RecordUsage[📊 Record Usage<br/>tokens used<br/>requests count<br/>update totals]
+    
+    RecordUsage --> CheckThreshold{Budget<br/>Threshold?}
+    
+    CheckThreshold -->|≥ 90%| CriticalAlert[🚨 Critical Alert<br/>90% budget used]
+    CheckThreshold -->|≥ 80%| WarnAlert[⚠️ Warning<br/>80% budget used]
+    CheckThreshold -->|< 80%| LogUsage[📝 Log Usage Stats]
+    
+    CriticalAlert --> Return
+    WarnAlert --> Return
+    LogUsage --> Return
+    
+    Return([Return LLM Response<br/>+ Model Used<br/>+ Cost Tracking])
+    
+    style Start fill:#2196F3,stroke:#1565C0,stroke-width:2px,color:#fff
+    style Selected fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+    style QuotaError fill:#F44336,stroke:#C62828,stroke-width:2px,color:#fff
+    style CriticalAlert fill:#F44336,stroke:#C62828,stroke-width:2px,color:#fff
+    style WarnAlert fill:#FF9800,stroke:#E65100,stroke-width:2px,color:#fff
+    style Return fill:#4CAF50,stroke:#2E7D32,stroke-width:2px,color:#fff
+```
+
+**Key Features:**
+- ✅ **Daily Reset**: Automatic at midnight Pacific Time
+- ✅ **6 Task Purposes**: bulk, quick, standard, detailed, vision, critical
+- ✅ **Intelligent Selection**: Prioritized model recommendations per purpose
+- ✅ **Quota Awareness**: Checks per-model RPD/RPM/TPM before selection
+- ✅ **Smart Fallback**: Tries all recommended models, then any available
+- ✅ **Cost Tracking**: Records per-model usage for visibility
+- ✅ **Error Handling**: 429 error with next reset time when all exhausted
 
 ---
 

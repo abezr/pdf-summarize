@@ -4,30 +4,64 @@
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
+import https from 'https';
+import {
+  ILLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VisionRequest,
+} from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
+import { quotaManager, QuotaManager, TaskPurpose } from './QuotaManager';
 
 export class GoogleProvider implements ILLMProvider {
   public readonly name = 'google';
   public readonly supportedModels = [
-    'gemini-1.5-pro',
-    'gemini-1.5-flash',
-    'gemini-pro',
-    'gemini-pro-vision',
+    // 2.5 family (present on this key)
+    'gemini-2.5-pro',
+    'gemini-2.5-pro-preview-06-05',
+    'gemini-2.5-pro-preview-05-06',
+    'gemini-2.5-pro-preview-03-25',
+    'gemini-2.5-flash',
+
+    // 2.0 family (present on this key)
+    'gemini-2.0-flash-001',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite-001',
+    'gemini-2.0-flash-lite',
+    'gemini-2.0-flash-exp',
+    'gemini-2.0-pro-exp',
+    'gemini-2.0-pro-exp-02-05',
+    'gemini-2.0-flash-thinking-exp',
+    'gemini-2.0-flash-thinking-exp-01-21',
+    'gemini-2.0-flash-thinking-exp-1219',
+    'gemini-2.0-flash-exp-image-generation',
+
+    // Experimental older ID still exposed
+    'gemini-exp-1206',
   ];
-  
+
   private client: GoogleGenerativeAI | null = null;
   private apiKey: string | null = null;
-  private defaultModel: string;
+  private enableQuotaManagement: boolean;
+  private availableModels: Set<string> = new Set();
+  private modelsLoaded = false;
+  private modelsLoadPromise: Promise<void> | null = null;
 
   constructor() {
     this.apiKey = process.env.GOOGLE_API_KEY || null;
-    this.defaultModel = process.env.GOOGLE_MODEL || 'gemini-1.5-pro';
-    
+    // Enable quota management by default (disable with GOOGLE_QUOTA_MANAGEMENT=false)
+    this.enableQuotaManagement =
+      process.env.GOOGLE_QUOTA_MANAGEMENT !== 'false';
+    this.availableModels = new Set(this.supportedModels);
+
     if (this.apiKey) {
       this.client = new GoogleGenerativeAI(this.apiKey);
-      logger.info('Google AI provider initialized', { model: this.defaultModel });
+      logger.info('Google AI provider initialized', {
+        quotaManagement: this.enableQuotaManagement,
+        supportedModels: this.supportedModels.length,
+      });
     } else {
       logger.warn('Google API key not found, provider disabled');
     }
@@ -42,68 +76,176 @@ export class GoogleProvider implements ILLMProvider {
       throw new AppError('Google AI provider not available', 503);
     }
 
-    const startTime = Date.now();
-    const modelName = request.model || this.defaultModel;
+    await this.ensureModelsLoaded();
 
-    try {
-      logger.info('Generating text with Google AI', { model: modelName });
+    const inputText = JSON.stringify(request.messages);
+    const estimatedTokens =
+      QuotaManager.estimateTokens(inputText) + (request.maxTokens || 4096);
 
-      const model = this.client.getGenerativeModel({ model: modelName });
-
-      // Convert messages to Gemini format
-      const contents = this.convertMessagesToGeminiFormat(request.messages);
-
-      const result = await model.generateContent({
-        contents,
-        generationConfig: {
-          maxOutputTokens: request.maxTokens || 4096,
-          temperature: request.temperature ?? 0.3,
-          topP: request.topP ?? 0.9,
-        },
-      });
-
-      const response = await result.response;
-      const content = response.text();
-
-      // Estimate token usage (Gemini doesn't provide exact counts in all cases)
-      const tokensUsed = {
-        prompt: this.estimateTokens(JSON.stringify(contents)),
-        completion: this.estimateTokens(content),
-        total: 0,
-      };
-      tokensUsed.total = tokensUsed.prompt + tokensUsed.completion;
-
-      // Calculate cost (Google AI pricing)
-      const cost = this.calculateCost(modelName, tokensUsed);
-      const processingTime = Date.now() - startTime;
-
-      logger.info('Google AI text generation completed', {
+    // Intelligent model selection based on quota management
+    let modelName: string;
+    if (this.enableQuotaManagement && !request.model) {
+      const purpose = this.inferTaskPurpose(request);
+      modelName = quotaManager.selectModel(purpose, estimatedTokens);
+      logger.info('Model auto-selected by quota manager', {
+        purpose,
         model: modelName,
-        tokensUsed: tokensUsed.total,
-        cost,
-        processingTime,
+        estimatedTokens,
       });
+    } else {
+      modelName = request.model || 'gemini-2.5-flash';
 
-      return {
-        content,
-        model: modelName,
-        provider: 'google',
-        tokensUsed,
-        cost,
-        processingTime,
-      };
-    } catch (error: any) {
-      logger.error('Google AI text generation failed', { error: error.message });
-      
-      if (error.message?.includes('API key')) {
-        throw new AppError('Invalid Google API key', 401);
+      // Check quota even for explicit model requests
+      if (this.enableQuotaManagement) {
+        if (!quotaManager.hasAvailableQuota(modelName, estimatedTokens)) {
+          logger.warn(
+            `Requested model ${modelName} has no quota, attempting fallback`
+          );
+          const purpose = this.inferTaskPurpose(request);
+          modelName = quotaManager.selectModel(purpose, estimatedTokens);
+        }
       }
-      if (error.message?.includes('quota')) {
-        throw new AppError('Google AI quota exceeded', 429);
-      }
-      
-      throw new AppError('Google AI request failed', 500, { originalError: error });
     }
+
+    const candidates = this.filterAvailable(
+      this.buildModelFallbackChain(modelName)
+    );
+    let lastError: any = null;
+
+    for (const candidate of candidates) {
+      const apiModel = this.normalizeModelName(candidate);
+      const startTime = Date.now();
+
+      try {
+        logger.info('Generating text with Google AI', {
+          model: apiModel,
+          friendlyModel: candidate,
+        });
+
+        const model = this.client.getGenerativeModel({ model: apiModel });
+
+        // Convert messages to Gemini format
+        const contents = this.convertMessagesToGeminiFormat(request.messages);
+
+        const result = await model.generateContent({
+          contents,
+          generationConfig: {
+            maxOutputTokens: request.maxTokens || 4096,
+            temperature: request.temperature ?? 0.3,
+            topP: request.topP ?? 0.9,
+          },
+        });
+
+        const response = await result.response;
+        const content = response.text();
+
+        // Estimate token usage (Gemini doesn't provide exact counts in all cases)
+        const tokensUsed = {
+          prompt: this.estimateTokens(JSON.stringify(contents)),
+          completion: this.estimateTokens(content),
+          total: 0,
+        };
+        tokensUsed.total = tokensUsed.prompt + tokensUsed.completion;
+
+        // Record usage in quota manager
+        if (this.enableQuotaManagement) {
+          quotaManager.recordUsage(candidate, tokensUsed.total);
+        }
+
+        // Calculate cost (Google AI pricing)
+        const cost = this.calculateCost(candidate, tokensUsed);
+        const processingTime = Date.now() - startTime;
+
+        logger.info('Google AI text generation completed', {
+          model: candidate,
+          apiModel,
+          tokensUsed: tokensUsed.total,
+          cost,
+          processingTime,
+          quotaManaged: this.enableQuotaManagement,
+        });
+
+        return {
+          content,
+          model: candidate,
+          provider: 'google',
+          tokensUsed,
+          cost,
+          processingTime,
+        };
+      } catch (error: any) {
+        lastError = error;
+        logger.warn('Google AI text generation failed, trying fallback', {
+          error: error.message,
+          modelTried: apiModel,
+          friendlyModel: candidate,
+        });
+
+        const message = (error.message || '').toLowerCase();
+        const modelNotFound =
+          message.includes('not found') || message.includes('404');
+        if (!modelNotFound) {
+          break; // Non-404 error, stop trying fallbacks
+        }
+      }
+    }
+
+    if (lastError?.message?.includes('API key')) {
+      throw new AppError('Invalid Google API key', 401);
+    }
+    if (
+      lastError?.message?.toLowerCase().includes('quota') ||
+      lastError?.message?.toLowerCase().includes('rate limit')
+    ) {
+      throw new AppError('Google AI quota exceeded', 429, {
+        message: 'Daily quota exhausted. Please try again tomorrow.',
+        resetTime: quotaManager.getQuotaStatus().nextReset,
+      });
+    }
+
+    throw new AppError('Google AI request failed', 500, {
+      originalError: lastError,
+    });
+  }
+
+  /**
+   * Infer task purpose from request to select optimal model
+   */
+  private inferTaskPurpose(request: LLMRequest): TaskPurpose {
+    const messagesText = JSON.stringify(request.messages).toLowerCase();
+
+    // Check for keywords to determine purpose
+    if (
+      messagesText.includes('summarize') ||
+      messagesText.includes('summary')
+    ) {
+      if (messagesText.length > 10000) return 'bulk-processing';
+      return 'quick-summary';
+    }
+
+    if (messagesText.includes('analyze') || messagesText.includes('analysis')) {
+      if (
+        messagesText.includes('detailed') ||
+        messagesText.includes('comprehensive')
+      ) {
+        return 'detailed-analysis';
+      }
+      return 'standard-analysis';
+    }
+
+    if (
+      messagesText.includes('critical') ||
+      messagesText.includes('important')
+    ) {
+      return 'critical-task';
+    }
+
+    // Check request length to determine complexity
+    if (messagesText.length > 20000) return 'detailed-analysis';
+    if (messagesText.length < 5000) return 'quick-summary';
+
+    // Default to standard analysis
+    return 'standard-analysis';
   }
 
   public async analyzeImage(request: VisionRequest): Promise<LLMResponse> {
@@ -111,13 +253,39 @@ export class GoogleProvider implements ILLMProvider {
       throw new AppError('Google AI provider not available', 503);
     }
 
+    await this.ensureModelsLoaded();
     const startTime = Date.now();
 
-    try {
-      logger.info('Analyzing image with Google AI Vision');
+    // Select model for vision task based on quota
+    let modelName = 'gemini-2.5-pro'; // Default for vision
+    if (this.enableQuotaManagement) {
+      const estimatedTokens = this.estimateTokens(request.prompt) + 1000; // Image + response tokens
+      try {
+        modelName = quotaManager.selectModel(
+          'vision-analysis',
+          estimatedTokens
+        );
+        // Ensure selected model supports vision
+        if (
+          !modelName.includes('flash') &&
+          !modelName.includes('pro') &&
+          !modelName.includes('vision')
+        ) {
+          modelName = 'gemini-2.5-flash'; // Fallback to flash for vision
+        }
+      } catch (error) {
+        logger.warn('No quota available for vision, using default', { error });
+      }
+    }
 
-      // Use Gemini 1.5 Pro for vision tasks
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-pro' });
+    try {
+      logger.info('Analyzing image with Google AI Vision', {
+        model: modelName,
+      });
+
+      const model = this.client.getGenerativeModel({
+        model: this.normalizeModelName(modelName),
+      });
 
       const result = await model.generateContent([
         request.prompt,
@@ -139,10 +307,16 @@ export class GoogleProvider implements ILLMProvider {
       };
       tokensUsed.total = tokensUsed.prompt + tokensUsed.completion;
 
-      const cost = this.calculateCost('gemini-1.5-pro', tokensUsed);
+      // Record usage
+      if (this.enableQuotaManagement) {
+        quotaManager.recordUsage(modelName, tokensUsed.total);
+      }
+
+      const cost = this.calculateCost(modelName, tokensUsed);
       const processingTime = Date.now() - startTime;
 
       logger.info('Google AI vision analysis completed', {
+        model: modelName,
         tokensUsed: tokensUsed.total,
         cost,
         processingTime,
@@ -150,15 +324,30 @@ export class GoogleProvider implements ILLMProvider {
 
       return {
         content,
-        model: 'gemini-1.5-pro',
+        model: modelName,
         provider: 'google',
         tokensUsed,
         cost,
         processingTime,
       };
     } catch (error: any) {
-      logger.error('Google AI vision analysis failed', { error: error.message });
-      throw new AppError('Google AI vision analysis failed', 500, { originalError: error });
+      logger.error('Google AI vision analysis failed', {
+        error: error.message,
+      });
+
+      if (
+        error.message?.includes('quota') ||
+        error.message?.includes('rate limit')
+      ) {
+        throw new AppError('Google AI quota exceeded', 429, {
+          message: 'Daily quota exhausted. Please try again tomorrow.',
+          resetTime: quotaManager.getQuotaStatus().nextReset,
+        });
+      }
+
+      throw new AppError('Google AI vision analysis failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -166,44 +355,48 @@ export class GoogleProvider implements ILLMProvider {
     // Convert OpenAI message format to Gemini format
     const contents: any[] = [];
     let systemMessage = '';
-    
+
     for (const message of messages) {
       if (message.role === 'system') {
         // Gemini doesn't have system role, save it to prepend to first user message
-        systemMessage = typeof message.content === 'string' ? message.content : '';
+        systemMessage =
+          typeof message.content === 'string' ? message.content : '';
         continue;
       }
 
       const role = message.role === 'assistant' ? 'model' : 'user';
-      
+
       if (typeof message.content === 'string') {
         let text = message.content;
         // Prepend system message to first user message
         if (role === 'user' && systemMessage && contents.length === 0) {
           text = `${systemMessage}\n\n${text}`;
         }
-        
+
         contents.push({
           role,
           parts: [{ text }],
         });
       } else if (Array.isArray(message.content)) {
         // Handle multimodal content
-        const parts = message.content.map((part: any) => {
-          if (part.type === 'text') {
-            return { text: part.text };
-          } else if (part.type === 'image_url') {
-            // Extract base64 from data URL
-            const base64 = part.image_url.url.split(',')[1] || part.image_url.url;
-            return {
-              inlineData: {
-                data: base64,
-                mimeType: 'image/png',
-              },
-            };
-          }
-          return null;
-        }).filter(Boolean);
+        const parts = message.content
+          .map((part: any) => {
+            if (part.type === 'text') {
+              return { text: part.text };
+            } else if (part.type === 'image_url') {
+              // Extract base64 from data URL
+              const base64 =
+                part.image_url.url.split(',')[1] || part.image_url.url;
+              return {
+                inlineData: {
+                  data: base64,
+                  mimeType: 'image/png',
+                },
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
 
         contents.push({ role, parts });
       }
@@ -219,29 +412,216 @@ export class GoogleProvider implements ILLMProvider {
 
   private calculateCost(model: string, tokensUsed: any): number {
     // Google AI pricing (as of 2024)
+    // Free tier usage is $0, but we track theoretical costs
     const pricing: Record<string, { input: number; output: number }> = {
-      'gemini-1.5-pro': { input: 0.00125, output: 0.005 }, // per 1K tokens
-      'gemini-1.5-flash': { input: 0.000075, output: 0.0003 },
-      'gemini-pro': { input: 0.0005, output: 0.0015 },
+      // 2.5 family (approximate; adjust if billing enabled)
+      'gemini-2.5-flash': { input: 0.0005, output: 0.0015 },
+      'gemini-2.5-pro': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-06-05': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-05-06': { input: 0.0035, output: 0.0105 },
+      'gemini-2.5-pro-preview-03-25': { input: 0.0035, output: 0.0105 },
+
+      // 2.0 family
+      'gemini-2.0-flash-001': { input: 0.0005, output: 0.0015 },
+      'gemini-2.0-flash': { input: 0.0005, output: 0.0015 },
+      'gemini-2.0-flash-lite-001': { input: 0.0004, output: 0.0012 },
+      'gemini-2.0-flash-lite': { input: 0.0004, output: 0.0012 },
+      'gemini-2.0-flash-exp': { input: 0, output: 0 },
+      'gemini-2.0-pro-exp': { input: 0.00125, output: 0.005 },
+      'gemini-2.0-pro-exp-02-05': { input: 0.00125, output: 0.005 },
+      'gemini-2.0-flash-thinking-exp': { input: 0, output: 0 },
+      'gemini-2.0-flash-thinking-exp-01-21': { input: 0, output: 0 },
+      'gemini-2.0-flash-thinking-exp-1219': { input: 0, output: 0 },
+      'gemini-2.0-flash-exp-image-generation': { input: 0, output: 0 },
+
+      // Experimental older ID
+      'gemini-exp-1206': { input: 0, output: 0 }, // Experimental - free
     };
 
-    const modelPricing = pricing[model] || pricing['gemini-1.5-pro'];
+    const modelPricing =
+      pricing[model] || pricing['gemini-2.5-flash'] || { input: 0, output: 0 };
     const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
     const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
-    
+
     return inputCost + outputCost;
   }
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;
-    
+
+    await this.ensureModelsLoaded();
+
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      // Use cheapest model for health check
+      const [firstAvailable] =
+        this.filterAvailable(['gemini-2.5-flash', ...this.supportedModels]) ||
+        [];
+      const modelId =
+        firstAvailable || this.filterAvailable(this.supportedModels)[0];
+      const model = this.client.getGenerativeModel({
+        model: this.normalizeModelName(modelId),
+      });
       await model.generateContent('Hello');
       return true;
     } catch (error) {
       logger.error('Google AI health check failed', { error });
       return false;
     }
+  }
+
+  /**
+   * Get current quota status
+   */
+  public getQuotaStatus(): any {
+    if (!this.enableQuotaManagement) {
+      return {
+        enabled: false,
+        message: 'Quota management is disabled',
+      };
+    }
+
+    return {
+      enabled: true,
+      ...quotaManager.getQuotaStatus(),
+    };
+  }
+
+  /**
+   * Force reset quotas (for testing/admin purposes)
+   */
+  public resetQuotas(): void {
+    if (this.enableQuotaManagement) {
+      quotaManager.forceReset();
+      logger.info('Quotas manually reset');
+    }
+  }
+
+  /**
+   * Map friendly model names to API-ready model identifiers.
+   * Keep explicit model IDs to maximize compatibility.
+   */
+  private normalizeModelName(model: string): string {
+    // Pass through known IDs
+    if (this.availableModels.has(model) || this.supportedModels.includes(model))
+      return model;
+    return model;
+  }
+
+  /**
+   * Build a prioritized list of models to try, based on availability quirks.
+   */
+  private buildModelFallbackChain(preferred: string): string[] {
+    const chain = [
+      preferred,
+      'gemini-2.5-flash',
+      'gemini-2.5-pro',
+      'gemini-2.0-flash-001',
+      'gemini-2.0-flash',
+      'gemini-2.0-flash-lite-001',
+      'gemini-2.0-pro-exp',
+      'gemini-2.0-pro-exp-02-05',
+      'gemini-2.0-flash-exp',
+      'gemini-2.0-flash-thinking-exp',
+      'gemini-2.0-flash-thinking-exp-01-21',
+      'gemini-2.0-flash-thinking-exp-1219',
+      'gemini-exp-1206',
+    ];
+
+    // Remove duplicates while preserving order
+    return Array.from(new Set(chain));
+  }
+
+  /**
+   * Ensure we have an up-to-date list of models available to this API key.
+   */
+  private async ensureModelsLoaded(): Promise<void> {
+    if (this.modelsLoaded) return;
+    if (this.modelsLoadPromise) return this.modelsLoadPromise;
+
+    this.modelsLoadPromise = this.refreshAvailableModels();
+    await this.modelsLoadPromise;
+  }
+
+  /**
+   * Fetch available models from Google and cache the short names.
+   */
+  private async refreshAvailableModels(): Promise<void> {
+    if (!this.apiKey) {
+      this.modelsLoaded = true;
+      return;
+    }
+
+    try {
+      const names = await this.listModelsFromAPI();
+
+      if (names.length > 0) {
+        this.availableModels = new Set(
+          names.filter((n) => this.supportedModels.includes(n))
+        );
+        // Always keep supported as fallback
+        for (const n of this.supportedModels) this.availableModels.add(n);
+        this.modelsLoaded = true;
+        logger.info('Google models refreshed from ListModels', {
+          count: this.availableModels.size,
+        });
+        return;
+      }
+    } catch (error: any) {
+      logger.warn('Failed to refresh Google model list, using defaults', {
+        error: error?.message || String(error),
+      });
+    }
+
+    // Fallback: use supported list
+    this.availableModels = new Set(this.supportedModels);
+    this.modelsLoaded = true;
+  }
+
+  /**
+   * Call ListModels using https (avoids DOM fetch typings).
+   */
+  private async listModelsFromAPI(): Promise<string[]> {
+    const url = new URL(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`
+    );
+
+    return new Promise((resolve) => {
+      const req = https.get(url, (res) => {
+        const chunks: Buffer[] = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          try {
+            const raw = Buffer.concat(chunks).toString('utf8');
+            const body = JSON.parse(raw) as { models?: Array<{ name: string }> };
+            const names =
+              body.models?.map((m) => m.name.replace(/^models\//, '')) || [];
+            resolve(names);
+          } catch (err) {
+            logger.warn('Failed parsing ListModels response', {
+              error: (err as Error).message,
+            });
+            resolve([]);
+          }
+        });
+      });
+
+      req.on('error', (err) => {
+        logger.warn('ListModels request failed', { error: err.message });
+        resolve([]);
+      });
+
+      req.setTimeout(5000, () => {
+        req.destroy(new Error('timeout'));
+        resolve([]);
+      });
+    });
+  }
+
+  /**
+   * Filter a chain to models we know are available.
+   */
+  private filterAvailable(models: string[]): string[] {
+    const filtered = models.filter((m) => this.availableModels.has(m));
+    return filtered.length > 0 ? filtered : models;
   }
 }

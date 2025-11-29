@@ -53,27 +53,27 @@ export interface ILLMProvider {
    * Provider name (e.g., 'openai', 'google')
    */
   readonly name: string;
-  
+
   /**
    * Whether this provider is available (API key configured)
    */
   readonly isAvailable: boolean;
-  
+
   /**
    * List of supported models
    */
   readonly supportedModels: string[];
-  
+
   /**
    * Generate text from prompt
    */
   generateText(request: LLMRequest): Promise<LLMResponse>;
-  
+
   /**
    * Analyze image with vision capabilities
    */
   analyzeImage(request: VisionRequest): Promise<LLMResponse>;
-  
+
   /**
    * Check if provider is healthy
    */

@@ -10,6 +10,14 @@ This guide provides a structured reference to all documentation that an AI agent
 
 ---
 
+## Reality Check (current codebase)
+
+- Backend API only: Express + PostgreSQL + Redis (health check) with uploads stored on the local filesystem
+- LLM layer implemented: OpenAI + Google Gemini providers with quota manager (set `OPENAI_API_KEY`; `GOOGLE_API_KEY` optional)
+- Not implemented yet: React/Vite UI, Prometheus/Grafana/OpenTelemetry, RAGAS/evaluation pipeline, OCR/Tesseract, or the local-first SQLite/node-cache design (docs describe future work)
+
+---
+
 ## 📚 Documentation Structure
 
 ```
@@ -32,7 +40,8 @@ docs/
 ├── llm/                  # LLM provider implementation
 │   ├── MULTI-LLM-SUPPORT.md
 │   ├── MULTI-LLM-QUICKSTART.md
-│   └── MULTI-LLM-IMPLEMENTATION-SUMMARY.md
+│   ├── MULTI-LLM-IMPLEMENTATION-SUMMARY.md
+│   └── QUOTA-MANAGEMENT.md    # NEW: Dynamic quota management
 └── specifications/       # Feature specifications
     ├── PROJECT-SUMMARY.md
     ├── OCR-ENHANCEMENT.md
@@ -92,7 +101,15 @@ Read these documents in order:
    - Requirement verification
    - **When to use:** Verifying implementation completeness
 
-4. **[`src/services/llm/README.md`](./src/services/llm/README.md)** 💻 **CODE REFERENCE**
+4. **[`docs/llm/QUOTA-MANAGEMENT.md`](./docs/llm/QUOTA-MANAGEMENT.md)** 🎯 **NEW: QUOTA MANAGEMENT**
+   - Dynamic model selection based on daily quotas
+   - Intelligent task-purpose detection
+   - Automatic fallback when quota exhausted
+   - Google Gemini free tier limits (RPM/TPM/RPD)
+   - Cost optimization strategies (97%+ savings)
+   - **When to use:** Implementing quota-aware LLM calls
+
+5. **[`src/services/llm/README.md`](./src/services/llm/README.md)** 💻 **CODE REFERENCE**
    - Developer documentation
    - Usage patterns
    - Adding new providers
@@ -188,7 +205,82 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 4: Understanding the Architecture**
+### **Task 4: Managing Google Gemini Quotas**
+
+**Priority: HIGH** 🔴 **NEW FEATURE**
+
+**Dynamic Quota Management System:**
+
+This system automatically distributes token usage across Google Gemini models based on daily quotas, selecting the optimal model for each task and automatically falling back when limits are reached.
+
+**Required Reading:**
+
+1. **[`docs/llm/QUOTA-MANAGEMENT.md`](./docs/llm/QUOTA-MANAGEMENT.md)** 📊 **COMPREHENSIVE GUIDE**
+   - How quota tracking works
+   - Task purpose detection (6 types)
+   - Model selection algorithm
+   - Google Free Tier limits (RPM/TPM/RPD)
+   - Daily reset logic (midnight Pacific Time)
+   - Cost savings examples (97%+ reduction)
+   - Configuration and monitoring
+   - **When to use:** Implementing any LLM-dependent feature
+
+**Key Concepts:**
+
+```typescript
+// Automatic model selection based on task purpose
+import { llmProviderManager } from './services/llm';
+
+// System automatically selects best model with available quota
+const response = await llmProviderManager.generateText({
+  messages: [
+    { role: 'user', content: 'Summarize this document...' }
+  ]
+});
+
+// Response includes which model was used
+console.log(`Used: ${response.model}`); // e.g., "gemini-1.5-flash"
+```
+
+**Task Purpose Types:**
+- `bulk-processing` → flash-8b (4M TPM, cheapest)
+- `quick-summary` → 2.0-flash-exp (4M TPM, free)
+- `standard-analysis` → flash (1M TPM, fast)
+- `detailed-analysis` → pro (32K TPM, best quality)
+- `vision-analysis` → flash/pro (OCR/images)
+- `critical-task` → pro (must succeed)
+
+**Quota Status Monitoring:**
+
+```typescript
+import { quotaManager } from './services/llm';
+
+const status = quotaManager.getQuotaStatus();
+// Shows: per-model RPD/RPM/TPM usage, requests remaining, next reset time
+```
+
+**Configuration:**
+
+```bash
+# .env
+GOOGLE_QUOTA_MANAGEMENT=true      # Enable (default)
+```
+
+**Free Tier Limits to Remember:**
+- **gemini-1.5-pro**: 50 RPD (very limited!)
+- **gemini-1.5-flash**: 1,500 RPD
+- **gemini-1.5-flash-8b**: 1,500 RPD, 4M TPM
+
+**When Implementing:**
+- Don't hardcode models in `.env`
+- Let quota manager select models dynamically
+- Handle 429 errors (quota exhausted)
+- Use task purpose keywords in prompts
+- Monitor quota status in logs
+
+---
+
+### **Task 5: Understanding the Architecture**
 
 **Priority: HIGH** 🔴
 
@@ -216,7 +308,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 5: Implementing New Features**
+### **Task 6: Implementing New Features**
 
 **Priority: MEDIUM** 🟡
 
@@ -246,7 +338,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 6: Understanding OCR Integration**
+### **Task 7: Understanding OCR Integration**
 
 **Priority: MEDIUM** 🟡
 
@@ -270,7 +362,7 @@ export { ClaudeProvider } from './ClaudeProvider';
 
 ---
 
-### **Task 7: Debugging and Troubleshooting**
+### **Task 8: Debugging and Troubleshooting**
 
 **Priority: MEDIUM** 🟡
 
@@ -553,3 +645,196 @@ Feature specifications and requirements.
 ---
 
 **🤖 Happy Coding, AI Agent!**
+
+---
+
+## 🏠 Local-First Architecture (NEW)
+
+### **IMPORTANT: This project is designed for local deployment**
+
+The architecture has been updated to run entirely on localhost with minimal external dependencies.
+
+**Key Documents:**
+
+1. **[`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md)** ⭐ **MUST READ**
+   - Complete local-first architecture specification
+   - Zero external services (except LLM APIs)
+   - All local alternatives (SQLite, node-cache, filesystem)
+   - $0 infrastructure costs
+   - **When to use:** Understanding the new local-first approach
+
+2. **[`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md)** 💰 **CRITICAL**
+   - Extreme token cost optimization strategies
+   - 90-98% cost reduction techniques
+   - Aggressive caching implementation
+   - Content reduction pipeline
+   - Smart model selection
+   - **When to use:** Implementing cost-optimized LLM usage
+
+### Task: "Implement Local-First Architecture"
+
+**Required Reading:**
+1. [`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md) - Complete specification
+2. [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md) - Cost optimization
+3. [`docs/llm/MULTI-LLM-SUPPORT.md`](./docs/llm/MULTI-LLM-SUPPORT.md) - LLM provider system
+
+**Key Changes from Cloud Architecture:**
+
+| Component | Cloud Version | Local-First Version |
+|-----------|---------------|---------------------|
+| **Database** | PostgreSQL (cloud) | SQLite (file-based) |
+| **Cache** | Redis (cloud) | node-cache (in-memory) |
+| **Storage** | S3/GCS | Local filesystem |
+| **Embeddings** | OpenAI API | transformers.js (local) |
+| **OCR** | Google Vision API | Tesseract.js (local) |
+| **Monitoring** | Prometheus/Grafana | JSON logs + CLI dashboard |
+
+**Implementation Steps:**
+
+1. **Replace PostgreSQL with SQLite**
+   ```typescript
+   import Database from 'better-sqlite3';
+   
+   const db = new Database('./data/database.sqlite');
+   ```
+
+2. **Replace Redis with node-cache**
+   ```typescript
+   import NodeCache from 'node-cache';
+   
+   const cache = new NodeCache({ stdTTL: 3600 });
+   ```
+
+3. **Use Local Filesystem for Files**
+   ```typescript
+   const uploadDir = './data/uploads';
+   const graphDir = './data/graphs';
+   ```
+
+4. **Implement Local Embeddings**
+   ```typescript
+   import { pipeline } from '@xenova/transformers';
+   
+   const embedder = await pipeline('feature-extraction', 
+     'Xenova/all-MiniLM-L6-v2');
+   ```
+
+5. **Add Aggressive Token Caching**
+   ```typescript
+   // See TOKEN-OPTIMIZATION.md for complete implementation
+   const cacheManager = new CacheManager();
+   const result = await cacheManager.getOrGenerate(content, provider, model, generator);
+   ```
+
+**Cost Comparison:**
+
+- **Before (Cloud)**: $80-290/month
+- **After (Local-First)**: $5-20/month (only LLM API)
+- **Savings**: 75-95% reduction! 🎉
+
+---
+
+## 💰 Token Optimization (CRITICAL)
+
+### **Every LLM API call costs money - optimize aggressively!**
+
+**Required Reading:**
+- [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md) - Complete optimization guide
+
+**7 Optimization Strategies:**
+
+1. **Aggressive Caching** (60-80% savings)
+   - Memory cache → Disk cache → LLM API
+   - Never repeat the same call
+   - 7-day TTL for cached responses
+
+2. **Content Reduction** (50-70% savings)
+   - Remove boilerplate before sending
+   - Extract only key sentences
+   - Deduplicate similar content
+
+3. **Smart Model Selection** (50-90% cost savings)
+   - Use Gemini 1.5 Flash for bulk (55x cheaper than GPT-4o)
+   - Use Gemini 1.5 Pro for normal tasks (3.3x cheaper)
+   - Reserve GPT-4o for critical tasks only
+
+4. **Batch Processing** (20-30% savings)
+   - Group similar documents
+   - Reuse context across batch
+   - Process in single session
+
+5. **Local Pre-Processing** (70-90% token reduction)
+   - Do maximum work locally first
+   - Only send essential context to LLM
+   - Build graphs, embeddings locally
+
+6. **Prompt Optimization** (5-10% savings)
+   - Use concise prompts
+   - Avoid verbose instructions
+   - Structure output requests
+
+7. **Budget Enforcement** (prevent overspending)
+   - Set daily limits (e.g., $1/day)
+   - Track every token used
+   - Alert when limits approached
+   - Stop calls if exceeded
+
+**Expected Combined Savings**: 90-98% cost reduction! 🎉
+
+**Implementation Example:**
+
+```typescript
+// Before optimization
+const summary = await openai.chat.completions.create({
+  model: 'gpt-4o',
+  messages: [{ role: 'user', content: fullDocumentText }],  // $$$ EXPENSIVE
+});
+// Cost: $0.025 per document
+
+// After optimization
+const optimizedContent = contentOptimizer.optimize(documentText);
+const cachedResult = await cacheManager.getOrGenerate(
+  optimizedContent,
+  'google',
+  'gemini-1.5-flash',
+  () => generateSummary(optimizedContent)
+);
+// Cost: $0.0005 per document (50x cheaper!)
+```
+
+---
+
+## 🎯 Updated Quick Start for Local-First
+
+### **When starting work on local-first features:**
+
+1. **Architecture Understanding:**
+   - Read [`docs/architecture/LOCAL-FIRST-ARCHITECTURE.md`](./docs/architecture/LOCAL-FIRST-ARCHITECTURE.md)
+   - Understand zero-external-dependency philosophy
+   - Review local alternatives to cloud services
+
+2. **Cost Optimization:**
+   - Read [`docs/guides/TOKEN-OPTIMIZATION.md`](./docs/guides/TOKEN-OPTIMIZATION.md)
+   - Implement aggressive caching
+   - Use smart model selection
+
+3. **LLM Integration:**
+   - Use [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md)
+   - Prefer Gemini 1.5 Flash for cost
+   - Cache every LLM response
+
+4. **Local Storage:**
+   - Use SQLite, not PostgreSQL
+   - Use node-cache, not Redis
+   - Store files locally, not S3/GCS
+
+5. **Monitoring:**
+   - Track token usage meticulously
+   - Set daily budget limits
+   - Alert on high costs
+
+---
+
+**Last Updated**: 2025-11-27  
+**New Features**: Local-First Architecture + Token Optimization  
+**Repository**: https://github.com/abezr/pdf-summarize

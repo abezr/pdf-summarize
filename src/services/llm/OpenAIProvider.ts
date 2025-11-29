@@ -4,14 +4,25 @@
  */
 
 import OpenAI from 'openai';
-import { ILLMProvider, LLMRequest, LLMResponse, VisionRequest } from './ILLMProvider';
+import {
+  ILLMProvider,
+  LLMRequest,
+  LLMResponse,
+  VisionRequest,
+} from './ILLMProvider';
 import { logger } from '../../utils/logger';
 import { AppError } from '../../utils/errors';
+import { tokenManager } from './token-manager';
 
 export class OpenAIProvider implements ILLMProvider {
   public readonly name = 'openai';
-  public readonly supportedModels = ['gpt-4o', 'gpt-4-turbo', 'gpt-4', 'gpt-3.5-turbo'];
-  
+  public readonly supportedModels = [
+    'gpt-4o',
+    'gpt-4-turbo',
+    'gpt-4',
+    'gpt-3.5-turbo',
+  ];
+
   private client: OpenAI | null = null;
   private apiKey: string | null = null;
   private defaultModel: string;
@@ -19,7 +30,7 @@ export class OpenAIProvider implements ILLMProvider {
   constructor() {
     this.apiKey = process.env.OPENAI_API_KEY || null;
     this.defaultModel = process.env.OPENAI_MODEL || 'gpt-4o';
-    
+
     if (this.apiKey) {
       this.client = new OpenAI({ apiKey: this.apiKey });
       logger.info('OpenAI provider initialized', { model: this.defaultModel });
@@ -58,14 +69,20 @@ export class OpenAIProvider implements ILLMProvider {
         total: completion.usage?.total_tokens || 0,
       };
 
-      // Calculate cost (OpenAI pricing)
-      const cost = this.calculateCost(model, tokensUsed);
+      // Calculate cost using token manager
+      const costBreakdown = tokenManager.calculateCost(model, tokensUsed);
       const processingTime = Date.now() - startTime;
+
+      // Record usage for analytics
+      tokenManager.recordUsage(model, 'openai', 'text-generation', tokensUsed, {
+        requestModel: request.model,
+        maxTokens: request.maxTokens,
+      });
 
       logger.info('OpenAI text generation completed', {
         model,
         tokensUsed: tokensUsed.total,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       });
 
@@ -74,20 +91,22 @@ export class OpenAIProvider implements ILLMProvider {
         model: completion.model,
         provider: 'openai',
         tokensUsed,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       };
     } catch (error: any) {
       logger.error('OpenAI text generation failed', { error: error.message });
-      
+
       if (error.status === 429) {
         throw new AppError('OpenAI rate limit exceeded', 429);
       }
       if (error.status === 401) {
         throw new AppError('Invalid OpenAI API key', 401);
       }
-      
-      throw new AppError('OpenAI request failed', 500, { originalError: error });
+
+      throw new AppError('OpenAI request failed', 500, {
+        originalError: error,
+      });
     }
   }
 
@@ -131,12 +150,21 @@ export class OpenAIProvider implements ILLMProvider {
         total: completion.usage?.total_tokens || 0,
       };
 
-      const cost = this.calculateCost('gpt-4o', tokensUsed);
+      const costBreakdown = tokenManager.calculateCost('gpt-4o', tokensUsed);
       const processingTime = Date.now() - startTime;
+
+      // Record usage for analytics
+      tokenManager.recordUsage(
+        'gpt-4o',
+        'openai',
+        'vision-analysis',
+        tokensUsed,
+        { imageSize: request.imageBase64.length }
+      );
 
       logger.info('OpenAI vision analysis completed', {
         tokensUsed: tokensUsed.total,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       });
 
@@ -145,34 +173,20 @@ export class OpenAIProvider implements ILLMProvider {
         model: 'gpt-4o',
         provider: 'openai',
         tokensUsed,
-        cost,
+        cost: costBreakdown.totalCost,
         processingTime,
       };
     } catch (error: any) {
       logger.error('OpenAI vision analysis failed', { error: error.message });
-      throw new AppError('OpenAI vision analysis failed', 500, { originalError: error });
+      throw new AppError('OpenAI vision analysis failed', 500, {
+        originalError: error,
+      });
     }
-  }
-
-  private calculateCost(model: string, tokensUsed: any): number {
-    // OpenAI pricing (as of 2024)
-    const pricing: Record<string, { input: number; output: number }> = {
-      'gpt-4o': { input: 0.005, output: 0.015 }, // per 1K tokens
-      'gpt-4-turbo': { input: 0.01, output: 0.03 },
-      'gpt-4': { input: 0.03, output: 0.06 },
-      'gpt-3.5-turbo': { input: 0.0005, output: 0.0015 },
-    };
-
-    const modelPricing = pricing[model] || pricing['gpt-4o'];
-    const inputCost = (tokensUsed.prompt / 1000) * modelPricing.input;
-    const outputCost = (tokensUsed.completion / 1000) * modelPricing.output;
-    
-    return inputCost + outputCost;
   }
 
   public async healthCheck(): Promise<boolean> {
     if (!this.client) return false;
-    
+
     try {
       await this.client.models.list();
       return true;

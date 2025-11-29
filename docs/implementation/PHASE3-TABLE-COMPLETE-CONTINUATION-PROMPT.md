@@ -1,0 +1,445 @@
+# PDF Summary AI - Phase 3 Continuation Prompt
+
+**Continuing from Phase 3 Table Detection Complete (TASK-056) → Phase 3 Advanced Features (TASK-057 onwards)**
+
+---
+
+## 🎯 Current Status
+
+**Phase 1: Foundation - COMPLETED ✅**
+- ✅ All 18 foundation tasks complete
+- ✅ Express server running on port 4000
+- ✅ PostgreSQL + Redis operational
+- ✅ File upload system functional
+- ✅ Jest testing framework ready
+- ✅ Health checks passing (13/13 tests)
+
+**Phase 2: Core Features - COMPLETED ✅**
+- ✅ All 32 core feature tasks complete
+- ✅ PDF parsing with text extraction and metadata
+- ✅ Graph data structures (Node/Edge/Graph) implemented
+- ✅ Graph builder with hierarchical and sequential relationships
+- ✅ OpenAI integration with client wrapper and prompt templates
+- ✅ Graph-aware summarization service with 6 summary types
+- ✅ Token counting and cost estimation with analytics
+- ✅ Complete REST API (upload, list, get, delete, summarize)
+- ✅ Document management with CRUD operations and status tracking
+- ✅ Comprehensive Zod validation schemas
+- ✅ End-to-end PDF upload → graph → summary pipeline
+
+**Phase 3: Advanced Features - TABLE DETECTION COMPLETE ✅**
+- ✅ **Table Detection (6/6 tasks)**: TASK-051 to TASK-056 complete
+- ✅ Table detection library research and selection (@krakz999/tabula-node primary)
+- ✅ Dependencies installed (tabula-node + pdf-table-extractor)
+- ✅ Table extraction service with primary/fallback logic
+- ✅ Structured table data parsing (headers, rows, rawText)
+- ✅ Table nodes in knowledge graph with metadata
+- ✅ Comprehensive unit and integration tests
+
+**Phase 3: Advanced Features - REMAINING WORK 🚀**
+- **Image Extraction**: TASK-057 to TASK-061 (5 tasks)
+- **Reference Detection**: TASK-062 to TASK-068 (7 tasks)
+- **Semantic Processing**: TASK-069 to TASK-074 (6 tasks)
+- **MCP Context Retrieval**: TASK-075 to TASK-080 (6 tasks)
+- **Grounding System**: TASK-081 to TASK-085 (5 tasks)
+- **Evaluation System**: TASK-086 to TASK-092 (7 tasks)
+- **Observability**: TASK-093 to TASK-095 (3 tasks)
+- **Total Remaining**: 39 advanced feature tasks
+
+---
+
+## 📋 Phase 3 Remaining Task Overview
+
+### 3.2 Image Extraction (5 tasks: TASK-057 to TASK-061)
+- TASK-057: Install image extraction libraries
+- TASK-058: Extract images from PDF pages
+- TASK-059: Save images to storage (local/S3)
+- TASK-060: Create image nodes in graph
+- TASK-061: Add image extraction tests
+
+### 3.3 Reference Detection (7 tasks: TASK-062 to TASK-068)
+- TASK-062: Define reference patterns (regex)
+- TASK-063: Implement reference text detection
+- TASK-064: Match references to target nodes
+- TASK-065: Create reference edges in graph
+- TASK-066: Add reference validation
+- TASK-067: Test reference detection accuracy
+- TASK-068: Add reference detection tests
+
+### 3.4 Semantic Processing (6 tasks: TASK-069 to TASK-074)
+- TASK-069: Implement semantic chunking
+- TASK-070: Integrate OpenAI embeddings API
+- TASK-071: Generate embeddings for text nodes
+- TASK-072: Implement cosine similarity calculation
+- TASK-073: Create semantic edges in graph
+- TASK-074: Add embeddings caching (Redis)
+
+### 3.5 MCP Context Retrieval (6 tasks: TASK-075 to TASK-080)
+- TASK-075: Define MCP tool schemas
+- TASK-076: Implement get_related_node tool
+- TASK-077: Implement neighborhood traversal (BFS)
+- TASK-078: Add token budget management
+- TASK-079: Create context formatting
+- TASK-080: Test MCP retrieval with OpenAI
+
+### 3.6 Grounding System (5 tasks: TASK-081 to TASK-085)
+- TASK-081: Parse LLM outputs for statements
+- TASK-082: Extract grounding references from metadata
+- TASK-083: Link statements to source nodes
+- TASK-084: Calculate grounding reliability scores
+- TASK-085: Format grounded summary output
+
+### 3.7 Evaluation System (7 tasks: TASK-086 to TASK-092)
+- TASK-086: Set up Python RAGAS service
+- TASK-087: Implement RAGAS client (Node.js)
+- TASK-088: Calculate faithfulness score
+- TASK-089: Calculate answer relevancy score
+- TASK-090: Implement custom grounding metric
+- TASK-091: Implement custom coverage metric
+- TASK-092: Calculate overall evaluation score
+
+### 3.8 Observability (3 tasks: TASK-093 to TASK-095)
+- TASK-093: Set up Prometheus metrics
+- TASK-094: Implement OpenTelemetry tracing
+- TASK-095: Configure Grafana dashboards
+
+---
+
+## 🎯 Phase 3 Continuation Instructions
+
+**Prerequisites (Already Completed from Phase 1, 2 & Table Detection)**
+
+✅ Node.js project with TypeScript
+✅ Docker containers running (PostgreSQL + Redis)
+✅ Database schema and migrations
+✅ Client wrappers for database and Redis
+✅ Express server with middleware (CORS, compression, security)
+✅ File upload system with Multer and validation
+✅ Jest testing framework with TypeScript
+
+✅ **PDF Parser Service** - Complete PDF parsing with text extraction, metadata, paragraph detection
+✅ **Graph Data Structures** - Node/Edge/Graph interfaces, Graph class with adjacency list
+✅ **Graph Builder** - Converts PDF to knowledge graph with hierarchical and sequential relationships
+✅ **OpenAI Integration** - Client wrapper, prompt templates, summarization service, token management
+✅ **API Layer** - Complete REST API with document management, validation, and error handling
+
+✅ **Table Detection Service** - NEW: Extract tables from PDFs with primary/fallback logic
+✅ **Table Graph Integration** - NEW: Table nodes created in knowledge graph with metadata
+
+**Current Project Structure**
+```
+pdf-summarize/
+├── docker-compose.yml          # PostgreSQL + Redis services ✅
+├── src/
+│   ├── config/environment.ts   # Environment configuration ✅
+│   ├── database/               # PostgreSQL + Redis clients ✅
+│   ├── api/
+│   │   ├── controllers/
+│   │   │   └── document.controller.ts  # API endpoints ✅
+│   │   ├── middleware/
+│   │   │   └── upload.ts       # File upload middleware ✅
+│   │   ├── routes/
+│   │   │   └── documents.ts    # Document routes ✅
+│   │   └── schemas.ts          # Zod validation schemas ✅
+│   ├── models/
+│   │   ├── graph.model.ts      # Graph data structures ✅
+│   │   └── index.ts            # TypeScript interfaces ✅
+│   ├── services/
+│   │   ├── pdf-parser.service.ts        # PDF processing ✅
+│   │   ├── graph/                       # Graph services ✅
+│   │   │   ├── graph.ts                 # Graph class implementation
+│   │   │   ├── graph-factory.ts         # Node/Edge factories
+│   │   │   ├── graph-builder.ts         # PDF to graph conversion
+│   │   │   └── index.ts                 # Exports
+│   │   ├── llm/                         # LLM services ✅
+│   │   │   ├── OpenAIProvider.ts        # OpenAI integration
+│   │   │   ├── GoogleProvider.ts        # Google AI integration
+│   │   │   ├── LLMProviderManager.ts    # Provider management
+│   │   │   ├── prompt-templates.ts      # Prompt templates
+│   │   │   ├── summarization.service.ts # Summarization service
+│   │   │   ├── token-manager.ts         # Token & cost management
+│   │   │   └── index.ts                 # Exports
+│   │   ├── table-detection.service.ts   # NEW: Table extraction ✅
+│   │   ├── document.service.ts          # Document CRUD ✅
+│   │   └── [PHASE 3] New services will be added here
+│   ├── utils/                  # Logger, errors ✅
+│   └── server.ts               # Express server ✅
+├── tests/
+│   ├── unit/                   # Unit tests ✅
+│   │   ├── table-detection.service.test.ts  # NEW: Table tests ✅
+│   ├── fixtures/               # Mock data ✅
+│   └── utils/                  # Test helpers ✅
+└── package.json                # Dependencies ✅
+```
+
+---
+
+## 🚀 Continuation Strategy
+
+**Start with TASK-057: Install image extraction libraries**
+
+Follow sequential order within each task group:
+1. Image Extraction (TASK-057 → TASK-061)
+2. Reference Detection (TASK-062 → TASK-068)
+3. Semantic Processing (TASK-069 → TASK-074)
+4. MCP Context Retrieval (TASK-075 → TASK-080)
+5. Grounding System (TASK-081 → TASK-085)
+6. Evaluation System (TASK-086 → TASK-092)
+7. Observability (TASK-093 → TASK-095)
+
+**Test incrementally**: Run tests after each task completion
+
+**Use existing patterns**: Follow established code structure from Phase 1 & 2 & Table Detection
+
+**Maintain type safety**: Continue using TypeScript interfaces
+
+**Extend existing services**: Build upon the graph builder, table detection, and document management systems
+
+**Leverage table detection patterns**: Use similar service architecture for image extraction
+
+---
+
+## 📚 Key Documentation References
+
+**Required Reading for Remaining Phase 3:**
+
+- [`docs/implementation/TASK-SPECIFICATIONS.md`](./docs/implementation/TASK-SPECIFICATIONS.md) - Detailed task specs (Phase 3 tasks to be added)
+- [`docs/architecture/C4-ARCHITECTURE.md`](./docs/architecture/C4-ARCHITECTURE.md) - System design
+- [`docs/llm/MULTI-LLM-QUICKSTART.md`](./docs/llm/MULTI-LLM-QUICKSTART.md) - LLM integration
+- [`src/services/llm/README.md`](./src/services/llm/README.md) - LLM service patterns
+- [`src/services/table-detection.service.ts`](./src/services/table-detection.service.ts) - NEW: Table detection patterns
+
+**Integration Points:**
+- Graph: Extend `GraphBuilder` from `src/services/graph/` (table integration already added)
+- LLM: Use `llmProviderManager` from `src/services/llm/`
+- Document: Use `documentService` from `src/services/document.service.ts`
+- Table Detection: Use `tableDetectionService` from `src/services/table-detection.service.ts`
+- Models: Extend interfaces in `src/models/graph.model.ts`
+- Environment: Use `config` from `src/config/environment.ts`
+
+---
+
+## 🎯 Phase 3 Success Criteria (Remaining)
+
+**After completing all remaining Phase 3 tasks:**
+
+✅ **Image Extraction:**
+- Images extracted from PDF pages with metadata
+- Images stored locally or in cloud storage
+- Image nodes created in knowledge graph
+- Image processing integrated with table detection
+- OCR support for image content
+
+✅ **Reference Detection:**
+- Cross-references between document sections detected
+- Complex reference patterns (figures, tables, sections, citations)
+- Reference edges created in graph with validation
+- Reference accuracy testing and metrics
+
+✅ **Semantic Processing:**
+- Text nodes chunked semantically for embeddings
+- OpenAI embeddings API integrated with token optimization
+- Cosine similarity calculations for related content
+- Semantic edges connecting related concepts in graph
+- Embeddings cached in Redis for performance
+
+✅ **MCP Context Retrieval:**
+- MCP tool schemas defined for graph traversal
+- get_related_node tool with neighborhood BFS traversal
+- Token budget management for context windows
+- Context formatting optimized for LLM consumption
+- Integration tested with OpenAI and Google providers
+
+✅ **Grounding System:**
+- LLM outputs parsed for factual statements
+- Statements linked back to source document/table/image nodes
+- Grounding reliability scores calculated
+- Grounded summary output with source attribution
+- Integration with existing summarization service
+
+✅ **Evaluation System:**
+- Python RAGAS service for automated evaluation metrics
+- Node.js client for faithfulness and relevancy scores
+- Custom grounding and coverage metrics implemented
+- Overall evaluation dashboard with scoring
+- Continuous evaluation pipeline
+
+✅ **Observability:**
+- Prometheus metrics collection for all services
+- OpenTelemetry distributed tracing
+- Grafana dashboards for system monitoring
+- Performance metrics and alerting setup
+
+✅ **Testing & Quality:**
+- All new code tested (unit + integration)
+- Test coverage maintained >80%
+- ESLint + Prettier passing
+- Performance benchmarks for advanced features
+- End-to-end testing for complete advanced pipeline
+
+---
+
+## 🔗 Integration Points Summary
+
+**Graph Extensions:**
+```typescript
+import { GraphBuilder } from '../services/graph';
+// Extend GraphBuilder to add image nodes, reference edges, semantic edges
+const graph = await GraphBuilder.buildGraph(documentId, pdfResult, tables, images);
+```
+
+**LLM Extensions:**
+```typescript
+import { llmProviderManager } from '../services/llm';
+// Use for embeddings generation, MCP context retrieval, evaluation
+const embeddings = await llmProviderManager.generateEmbeddings(textChunks);
+```
+
+**New Services to Create:**
+- `image-extraction.service.ts` - Image extraction and storage
+- `reference-detection.service.ts` - Cross-reference analysis
+- `semantic-processing.service.ts` - Embeddings and similarity
+- `mcp-context.service.ts` - MCP tool implementation
+- `grounding.service.ts` - Statement grounding and scoring
+- `evaluation.service.ts` - RAGAS integration and metrics
+- `observability.service.ts` - Metrics and tracing
+
+---
+
+## 🏃‍♂️ Next Steps Execution
+
+**TASK-057: Install image extraction libraries**
+1. Research PDF image extraction libraries (pdf2pic, pdfjs-dist, canvas)
+2. Evaluate based on compatibility with existing stack
+3. Choose primary library with fallback options
+4. Install dependencies and test basic functionality
+
+**Continue through remaining Phase 3 systematically...**
+
+---
+
+## 📊 Progress Tracking
+
+**Phase 3 Progress**: 6/45 tasks complete (13%)
+**Overall Progress**: 56/95 tasks complete (59%)
+
+**Phase 3 Milestones:**
+- [x] Table detection working (6/45)
+- [ ] Image extraction complete (11/45)
+- [ ] Reference detection functional (18/45)
+- [ ] Semantic processing implemented (24/45)
+- [ ] MCP context retrieval working (30/45)
+- [ ] Grounding system operational (35/45)
+- [ ] Evaluation system running (42/45)
+- [ ] Observability dashboards live (45/45)
+
+---
+
+## 🔧 Key Technical Considerations (Remaining)
+
+### **Image Extraction Challenges**
+- Multiple image formats in PDFs (JPEG, PNG, TIFF)
+- Image quality and resolution handling
+- Storage strategy (local filesystem vs cloud)
+- Memory usage for large images
+- OCR integration for image content
+
+### **Reference Detection Challenges**
+- Complex reference patterns (figures, tables, sections, citations)
+- Context-dependent reference resolution
+- Ambiguity handling (e.g., "see figure 1" vs "see section 1")
+- Multi-language document support
+- Performance for large documents
+
+### **Semantic Processing Challenges**
+- Embedding API rate limits and costs
+- Similarity threshold tuning for different content types
+- Redis caching strategy for large embedding sets
+- Memory usage for vector similarity calculations
+- Chunk size optimization for different document types
+
+### **MCP Integration Challenges**
+- Tool schema design for complex graph traversal
+- Token budget optimization across different LLM providers
+- Context relevance filtering for different task types
+- Real-time performance requirements for interactive use
+
+### **Evaluation System Challenges**
+- RAGAS setup and integration complexity
+- Metric calculation accuracy for different content types
+- Baseline establishment for custom metrics
+- Continuous evaluation pipeline performance
+
+---
+
+## 🎯 Phase 3 Architecture Extensions (Remaining)
+
+The remaining Phase 3 architecture extends the current system:
+
+```mermaid
+graph TB
+    subgraph "Phase 2 + Table Detection (Complete)"
+        PDF[PDF Parser] --> Graph[Graph Builder]
+        Graph --> LLM[LLM Summarization]
+        LLM --> API[REST API]
+        PDF --> Tables[Table Detection]
+        Tables --> Graph
+    end
+
+    subgraph "Remaining Phase 3 Extensions"
+        PDF --> Images[Image Extraction]
+        Graph --> Refs[Reference Detection]
+        Graph --> Semantic[Semantic Processing]
+        Semantic --> MCP[MCP Context Retrieval]
+        LLM --> Grounding[Grounding System]
+        Grounding --> Eval[Evaluation System]
+        API --> Observ[Observability]
+    end
+
+    Images --> Graph
+    Refs --> Graph
+    Semantic --> Graph
+    MCP --> LLM
+    Eval --> API
+    Observ --> API
+```
+
+---
+
+## 💡 Implementation Priorities
+
+### **High Priority (Must-Have for Demo)**
+- Image extraction with OCR integration
+- Basic reference detection for document navigation
+- Semantic similarity for related content discovery
+- MCP context retrieval demo
+- Grounding system with source attribution
+
+### **Medium Priority (Nice-to-Have)**
+- Advanced reference pattern matching
+- Embedding caching optimization
+- Custom evaluation metrics
+- Basic observability dashboards
+
+### **Low Priority (Future Enhancements)**
+- Full RAGAS evaluation suite
+- Distributed tracing
+- Advanced performance optimizations
+- Multi-language support
+
+---
+
+## 🚀 Ready to continue Phase 3 implementation!
+
+**Start with TASK-057 and proceed systematically through image extraction, reference detection, semantic processing, MCP integration, grounding, evaluation, and observability.**
+
+**The table detection foundation is complete - now building advanced document understanding and evaluation capabilities! 🚀**
+
+---
+
+**Last Updated**: 2025-11-27
+**Phase 3 Tasks**: 39 remaining (TASK-057 to TASK-095)
+**Estimated Duration**: 12-16 days
+**Ready for**: Image extraction and advanced features
+
+---

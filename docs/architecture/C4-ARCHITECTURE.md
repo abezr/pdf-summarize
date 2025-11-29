@@ -64,10 +64,11 @@ Unlike traditional string-based PDF processing, this system treats documents as 
 │  └───┬───────────────────────┬───────────────────┘             │
 │      │                       │                                  │
 │      v                       v                                  │
-│  ┌─────────────┐       ┌──────────────┐                       │
-│  │  OpenAI API │       │  GCP Vertex  │                       │
-│  │  (GPT-4o)   │       │  AI (Gemini) │                       │
-│  └─────────────┘       └──────────────┘                       │
+│  ┌─────────────┐       ┌────────────────────────────┐         │
+│  │  OpenAI API │       │  Google AI (Gemini)        │         │
+│  │  (GPT-4o)   │       │  • Dynamic Quota Management│         │
+│  │             │       │  • Multi-Model Selection   │         │
+│  └─────────────┘       └────────────────────────────┘         │
 │                                                                  │
 │  External Dependencies:                                         │
 │  • PostgreSQL (Document metadata, history)                      │
@@ -80,8 +81,11 @@ Unlike traditional string-based PDF processing, this system treats documents as 
 ### External Actors
 
 - **User**: Uploads PDFs, views summaries, accesses history
-- **OpenAI API**: LLM for summarization (GPT-4o, GPT-4-turbo)
-- **GCP Vertex AI**: Alternative LLM provider (Gemini 1.5 Pro)
+- **OpenAI API**: LLM for summarization (GPT-4o, GPT-4-turbo, GPT-3.5-turbo)
+- **Google AI**: Multi-model LLM provider with quota management
+  - **Models**: Gemini 2.0 Flash Exp, Gemini 1.5 Pro, Gemini 1.5 Flash, Gemini 1.5 Flash-8B
+  - **Quota Manager**: Daily token tracking, intelligent model selection, automatic fallback
+  - **Cost Savings**: 97%+ reduction through optimal model distribution
 - **PostgreSQL**: Document metadata, processing history, evaluation results
 - **Redis**: In-memory graph cache, embedding cache
 - **S3/GCS**: Long-term PDF storage
@@ -325,10 +329,23 @@ Unlike traditional string-based PDF processing, this system treats documents as 
 │  │  └────────────────────┬─────────────────────────────────┘ │ │
 │  │                       v                                    │ │
 │  │  ┌──────────────────────────────────────────────────────┐ │ │
-│  │  │ LLM Router                                            │ │ │
-│  │  │ • OpenAI GPT-4o (default)                            │ │ │
-│  │  │ • GCP Gemini 1.5 Pro (fallback)                      │ │ │
-│  │  │ • Model selection based on document size             │ │ │
+│  │  │ LLM Provider Manager (Multi-LLM + Quota Mgmt)    │ │ │
+│  │  │ ┌──────────────────────────────────────────────┐ │ │ │
+│  │  │ │ OpenAI Provider                              │ │ │ │
+│  │  │ │ • GPT-4o, GPT-4, GPT-3.5-turbo              │ │ │ │
+│  │  │ └──────────────────────────────────────────────┘ │ │ │
+│  │  │ ┌──────────────────────────────────────────────┐ │ │ │
+│  │  │ │ Google Provider + Quota Manager              │ │ │ │
+│  │  │ │ • Models: flash-8b, flash, pro, 2.0-exp     │ │ │ │
+│  │  │ │ • Task purpose detection (6 types)           │ │ │ │
+│  │  │ │ • Daily quota tracking (tokens + requests)   │ │ │ │
+│  │  │ │ • Smart fallback when quota exhausted        │ │ │ │
+│  │  │ │ • Resets: midnight Pacific Time              │ │ │ │
+│  │  │ │ • Cost savings: 97%+ through distribution    │ │ │ │
+│  │  │ └──────────────────────────────────────────────┘ │ │ │
+│  │  │ • Auto-detection (API key presence)              │ │ │
+│  │  │ • Provider fallback (primary → backup)           │ │ │
+│  │  │ • Cost tracking per provider                     │ │ │
 │  │  └────────────────────┬─────────────────────────────────┘ │ │
 │  │                       v                                    │ │
 │  │  ┌──────────────────────────────────────────────────────┐ │ │
@@ -430,6 +447,118 @@ Unlike traditional string-based PDF processing, this system treats documents as 
 │  └────────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────────┘
 ```
+
+### LLM Quota Management Component (NEW)
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│              Google Gemini Quota Manager Component                │
+│                                                                   │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Quota Tracker                                              │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Per-Model Quota Tracking                             │ │ │
+│  │  │ • gemini-2.0-flash-exp: 1,500 RPD, 4M TPM          │ │ │
+│  │  │ • gemini-1.5-flash: 1,500 RPD, 1M TPM              │ │ │
+│  │  │ • gemini-1.5-flash-8b: 1,500 RPD, 4M TPM           │ │ │
+│  │  │ • gemini-1.5-pro: 50 RPD, 32K TPM (limited!)       │ │ │
+│  │  │ • gemini-exp-1206: 50 RPD, 32K TPM                 │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Daily Budget Manager                                  │ │ │
+│  │  │ • Total tokens allowed/day (default: 1M)             │ │ │
+│  │  │ • Track usage across all models                      │ │ │
+│  │  │ • Alert at 80% and 90% thresholds                    │ │ │
+│  │  │ • Prevent new requests if budget exhausted           │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Reset Manager                                         │ │ │
+│  │  │ • Auto-reset: midnight Pacific Time                  │ │ │
+│  │  │ • Check on every request                             │ │ │
+│  │  │ • Log reset events                                   │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                │                                  │
+│                                v                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Task Purpose Detector                                      │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Keyword Analysis                                      │ │ │
+│  │  │ • "summarize" → bulk/quick summary                   │ │ │
+│  │  │ • "analyze" + "detailed" → detailed analysis         │ │ │
+│  │  │ • "critical"/"important" → critical task             │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Length Analysis                                       │ │ │
+│  │  │ • < 5K chars → quick-summary                         │ │ │
+│  │  │ • 5K-20K chars → standard-analysis                   │ │ │
+│  │  │ • > 20K chars → detailed-analysis                    │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Task Purpose Types (6)                                │ │ │
+│  │  │ • bulk-processing                                     │ │ │
+│  │  │ • quick-summary                                       │ │ │
+│  │  │ • standard-analysis                                   │ │ │
+│  │  │ • detailed-analysis                                   │ │ │
+│  │  │ • vision-analysis                                     │ │ │
+│  │  │ • critical-task                                       │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                │                                  │
+│                                v                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Model Selector                                             │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Recommendation Engine                                 │ │ │
+│  │  │ bulk-processing    → flash-8b → 2.0-flash → flash   │ │ │
+│  │  │ quick-summary      → 2.0-flash → flash → flash-8b   │ │ │
+│  │  │ standard-analysis  → flash → 2.0-flash → pro        │ │ │
+│  │  │ detailed-analysis  → pro → exp-1206 → flash         │ │ │
+│  │  │ vision-analysis    → flash → pro → 2.0-flash        │ │ │
+│  │  │ critical-task      → pro → exp-1206 → flash         │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Quota-Aware Selection                                 │ │ │
+│  │  │ 1. Get recommended models (priority order)           │ │ │
+│  │  │ 2. Check each model's available quota                │ │ │
+│  │  │ 3. Select first available model                      │ │ │
+│  │  │ 4. Fallback to any available if all recommended full │ │ │
+│  │  │ 5. Throw 429 error if ALL models exhausted           │ │ │
+│  │  └────────────────────┬─────────────────────────────────┘ │ │
+│  │                       v                                    │ │
+│  │  ┌──────────────────────────────────────────────────────┐ │ │
+│  │  │ Usage Recorder                                        │ │ │
+│  │  │ • Record tokens used after each request              │ │ │
+│  │  │ • Increment request count                            │ │ │
+│  │  │ • Update total daily usage                           │ │ │
+│  │  │ • Log usage statistics                               │ │ │
+│  │  └──────────────────────────────────────────────────────┘ │ │
+│  └────────────────────────────────────────────────────────────┘ │
+│                                │                                  │
+│                                v                                  │
+│  ┌────────────────────────────────────────────────────────────┐ │
+│  │  Monitoring & Alerts                                        │ │
+│  │  • Log model selections (purpose + model chosen)           │ │
+│  │  • Warn at 80% budget usage                                │ │
+│  │  • Critical alert at 90% budget usage                      │ │
+│  │  • Error when quota exhausted (next reset time provided)   │ │
+│  │  • Expose quota status API endpoint                        │ │
+│  └────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+**Benefits**:
+- **97%+ Cost Savings**: Optimal distribution across free tier models
+- **30x More Capacity**: 1,500 RPD vs 50 RPD (pro-only approach)
+- **Zero Configuration**: Works out of the box with sensible defaults
+- **Intelligent**: Auto-selects best model for each task purpose
+- **Resilient**: Automatic fallback when quota exhausted
+- **Observable**: Real-time quota tracking and alerts
 
 ---
 

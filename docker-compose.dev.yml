@@ -3,8 +3,6 @@
 # Optimized for local development with hot reload
 # =============================================================================
 
-version: '3.8'
-
 services:
   # =============================================================================
   # Application Service (Development with Hot Reload)

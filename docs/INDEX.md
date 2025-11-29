@@ -15,6 +15,7 @@ Complete guide to all documentation in the PDF Summary AI project.
 ### Getting Started
 - **[README.md](../README.md)** - Main project README with quick start
 - **[Quick Reference](./guides/QUICK-REFERENCE.md)** - Common tasks & troubleshooting
+- **[Windows Setup](./guides/WINDOWS-SETUP.md)** - Windows-specific instructions ⭐ New
 - **[Docker Guide](./guides/DOCKER-GUIDE.md)** - Production deployment
 
 ### Configuration

@@ -15,7 +15,8 @@ cd pdf-summarize
 npm install
 
 # 2. Configure (choose ONE provider)
-cp .env.example .env
+cp .env.example .env      # Linux/Mac
+# Or: copy .env.example .env   (Windows)
 # Add: GOOGLE_API_KEY=your-key-here (FREE, recommended)
 # OR:  OPENAI_API_KEY=your-key-here (paid)
 
@@ -24,6 +25,8 @@ npm run dev
 ```
 
 **Access**: http://localhost:3000
+
+> **Windows Users**: See [Windows Setup Guide](docs/guides/WINDOWS-SETUP.md) for detailed instructions
 
 ## What's This?
 
@@ -51,12 +54,14 @@ A sophisticated PDF summarization system that treats documents as **Knowledge Gr
 ### 🐳 Docker Support
 ```bash
 # Development with hot-reload
-npm run docker:dev
+npm run docker:dev              # Works on Windows, Mac, Linux
 
 # Production with nginx
 npm run docker:prod:build
 npm run docker:prod:up
 ```
+
+> All npm scripts are cross-platform compatible (Windows/Mac/Linux)
 
 ### 📊 Built-in Observability
 - Prometheus metrics

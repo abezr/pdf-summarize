@@ -77,13 +77,18 @@ cp .env.example .env
 # Edit .env with your API keys
 
 # 2. Build and run with Docker Compose
-docker-compose up -d
+# Development
+npm run docker:dev              # or: ./scripts/docker-dev.sh up
+
+# Production
+npm run docker:prod:build       # Build images
+npm run docker:prod:up          # Start services
 
 # 3. Access the application
-# Frontend: http://localhost:3000
-# API: http://localhost:3000/api
-# Metrics: http://localhost:9090 (Prometheus)
-# Dashboards: http://localhost:3001 (Grafana)
+# App: http://localhost:3001 (dev) or http://localhost (prod via nginx)
+# Grafana: http://localhost:3000 (admin/admin)
+# Prometheus: http://localhost:9090
+# Jaeger: http://localhost:16686
 ```
 
 ### Environment Configuration
@@ -275,10 +280,11 @@ MAX_FILE_SIZE=104857600  # Increase to 100MB
 ### Next Steps
 
 1. 📖 Read the [Quick Reference Guide](./docs/guides/QUICK-REFERENCE.md)
-2. 🤖 Explore [Multi-LLM Documentation](./docs/llm/MULTI-LLM-QUICKSTART.md)
-3. 🎯 Check [Quota Management Guide](./docs/llm/QUOTA-MANAGEMENT.md)
-4. 🏗️ Review [Architecture Diagrams](./docs/architecture/ARCHITECTURE-DIAGRAMS.md)
-5. 💻 Start building with [Implementation Guide](./docs/implementation/IMPLEMENTATION-GUIDE.md)
+2. 🐳 Deploy with [Docker Guide](./docs/guides/DOCKER-GUIDE.md) - Complete Docker setup
+3. 🤖 Explore [Multi-LLM Documentation](./docs/llm/MULTI-LLM-QUICKSTART.md)
+4. 🎯 Check [Quota Management Guide](./docs/llm/QUOTA-MANAGEMENT.md)
+5. 🏗️ Review [Architecture Diagrams](./docs/architecture/ARCHITECTURE-DIAGRAMS.md)
+6. 💻 Start building with [Implementation Guide](./docs/implementation/IMPLEMENTATION-GUIDE.md)
 
 ---
 

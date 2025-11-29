@@ -1,0 +1,46 @@
+# =============================================================================
+# Development Dockerfile for PDF Summary AI
+# Optimized for fast iteration with hot reload
+# =============================================================================
+
+FROM node:20-alpine
+
+# Install build dependencies and utilities
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    cairo-dev \
+    jpeg-dev \
+    pango-dev \
+    giflib-dev \
+    pixman-dev \
+    graphicsmagick \
+    ghostscript \
+    poppler-utils \
+    wget \
+    curl
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install all dependencies (including devDependencies)
+RUN npm install
+
+# Copy TypeScript configuration
+COPY tsconfig.json ./
+
+# Create directories
+RUN mkdir -p uploads data/images data/cache src
+
+# Expose ports
+EXPOSE 3000 9229
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
+
+# Start with hot reload
+CMD ["npm", "run", "dev"]

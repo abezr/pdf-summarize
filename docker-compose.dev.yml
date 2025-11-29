@@ -1,19 +1,25 @@
+# =============================================================================
+# Docker Compose - Development Environment
+# Optimized for local development with hot reload
+# =============================================================================
+
 version: '3.8'
 
 services:
   # =============================================================================
-  # Application Service
+  # Application Service (Development with Hot Reload)
   # =============================================================================
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-    container_name: pdfai-app
+      dockerfile: Dockerfile.dev
+    container_name: pdfai-app-dev
     ports:
-      - "3001:3000"  # Changed to 3001 to avoid conflict with Grafana
+      - "3001:3000"
+      - "9229:9229"  # Node.js debugger port
     environment:
       # Node
-      NODE_ENV: production
+      NODE_ENV: development
       PORT: 3000
       
       # Database
@@ -28,9 +34,9 @@ services:
       REDIS_HOST: redis
       REDIS_PORT: 6379
       
-      # LLM Providers (set these via .env file or environment)
-      # OPENAI_API_KEY: ${OPENAI_API_KEY}
-      # GOOGLE_API_KEY: ${GOOGLE_API_KEY}
+      # LLM Providers
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       LLM_PROVIDER: auto
       LLM_ENABLE_FALLBACK: "true"
       GOOGLE_QUOTA_MANAGEMENT: "true"
@@ -46,24 +52,20 @@ services:
       
       # Observability
       METRICS_ENABLED: "true"
-      METRICS_PORT: 9090
-      LOG_LEVEL: info
-      PROMETHEUS_ENABLED: "true"
+      LOG_LEVEL: debug
+      DEBUG: "true"
       
     volumes:
+      - ./src:/app/src:ro  # Read-only source for hot reload
       - ./uploads:/app/uploads
       - ./data:/app/data
+      - /app/node_modules  # Don't mount node_modules
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+    command: npm run dev
     restart: unless-stopped
     networks:
       - default
@@ -73,7 +75,7 @@ services:
   # =============================================================================
   postgres:
     image: postgres:15-alpine
-    container_name: pdfai-postgres
+    container_name: pdfai-postgres-dev
     environment:
       POSTGRES_USER: pdfai
       POSTGRES_PASSWORD: pdfai_dev
@@ -81,86 +83,79 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_dev_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pdfai"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - default
 
   redis:
     image: redis:7-alpine
-    container_name: pdfai-redis
+    container_name: pdfai-redis-dev
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis_dev_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
     command: redis-server --appendonly yes
+    networks:
+      - default
 
-  # Observability Stack
+  # =============================================================================
+  # Observability Stack (Optional for Development)
+  # =============================================================================
   prometheus:
     image: prom/prometheus:latest
-    container_name: pdfai-prometheus
+    container_name: pdfai-prometheus-dev
     ports:
       - "9090:9090"
     volumes:
       - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
+      - prometheus_dev_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
       - '--web.enable-lifecycle'
     depends_on:
-      - postgres
-      - redis
+      - app
     networks:
       - default
     restart: unless-stopped
+    profiles:
+      - observability  # Only start with: docker-compose --profile observability up
 
   grafana:
     image: grafana/grafana:latest
-    container_name: pdfai-grafana
+    container_name: pdfai-grafana-dev
     ports:
       - "3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
     volumes:
-      - grafana_data:/var/lib/grafana
+      - grafana_dev_data:/var/lib/grafana
       - ./grafana-dashboard.json:/etc/grafana/dashboards/dashboard.json
       - ./observability/grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
+    networks:
+      - default
     restart: unless-stopped
-
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    container_name: pdfai-jaeger
-    ports:
-      - "16686:16686"  # Jaeger UI
-      - "14268:14268"  # Accept jaeger.thrift over HTTP
-      - "14250:14250"  # Accept jaeger.thrift over gRPC
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    volumes:
-      - jaeger_data:/tmp
-    restart: unless-stopped
+    profiles:
+      - observability
 
 volumes:
-  postgres_data:
-  redis_data:
-  prometheus_data:
-  grafana_data:
-  jaeger_data:
+  postgres_dev_data:
+  redis_dev_data:
+  prometheus_dev_data:
+  grafana_dev_data:
 
 networks:
   default:

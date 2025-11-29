@@ -19,7 +19,15 @@
     "observability:start": "docker-compose -f docker-compose.observability.yml up -d",
     "observability:stop": "docker-compose -f docker-compose.observability.yml down",
     "observability:full": "docker-compose up -d prometheus grafana jaeger",
-    "observability:full-stop": "docker-compose down prometheus grafana jaeger"
+    "observability:full-stop": "docker-compose down prometheus grafana jaeger",
+    "docker:dev": "./scripts/docker-dev.sh up",
+    "docker:dev:full": "./scripts/docker-dev.sh up-full",
+    "docker:dev:down": "./scripts/docker-dev.sh down",
+    "docker:prod:build": "./scripts/docker-prod.sh build",
+    "docker:prod:up": "./scripts/docker-prod.sh up",
+    "docker:prod:down": "./scripts/docker-prod.sh down",
+    "docker:build": "docker build -t pdfai-app:latest .",
+    "docker:build:dev": "docker build -f Dockerfile.dev -t pdfai-app:dev ."
   },
   "dependencies": {
     "@google/generative-ai": "^0.1.3",

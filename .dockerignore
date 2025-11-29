@@ -1,0 +1,68 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files (will be configured separately)
+.env
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Logs
+logs/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation (not needed in container)
+docs/
+*.md
+!README.md
+
+# Development files
+*.test.ts
+*.spec.ts
+__tests__/
+__mocks__/
+
+# Docker files (don't need these inside the container)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Uploads and data (will be volumes)
+uploads/
+data/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Debug files
+debug*.js
+*.map

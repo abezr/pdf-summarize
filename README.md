@@ -17,6 +17,17 @@ A sophisticated **document-aware PDF summarization system** that treats document
 
 ---
 
+## Current Implementation Snapshot (Nov 2025)
+
+- Backend API only (Express + TypeScript) with document upload/list/stats/get/summarize/delete endpoints and health checks
+- Data layer is PostgreSQL via `DATABASE_URL` with `node-pg-migrate` migrations in `src/database/migrations`
+- Uploads and extracted assets are written to the local filesystem (see `UPLOAD_DIR` and `./data/images`); no S3/GCS integration today
+- LLM layer includes OpenAI + Google Gemini providers with quota management and graph-aware prompt templates; set `OPENAI_API_KEY` and optionally `GOOGLE_API_KEY`
+- Redis client exists but is only used in the health check; application caching is not wired yet
+- Observability: Prometheus metrics, Grafana dashboards, OpenTelemetry tracing, structured logging with Winston; evaluation/RAGAS service, OCR/Tesseract, local-first SQLite/node-cache stack remain design docs
+
+---
+
 ## 🚀 Installation & Quick Setup
 
 ### Prerequisites

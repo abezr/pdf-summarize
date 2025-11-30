@@ -96,8 +96,6 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
             --assign-public-ip true \
             --ssh-authorized-keys-file "$SSH_PUBLIC_KEY_FILE" \
             --agent-config '{"pluginsConfig":[{"name":"Custom Logs Monitoring","desiredState":"ENABLED"},{"name":"Compute Instance Monitoring","desiredState":"ENABLED"},{"name":"Cloud Guard Workload Protection","desiredState":"ENABLED"},{"name":"OS Management Service Agent","desiredState":"DISABLED"},{"name":"Vulnerability Scanning","desiredState":"DISABLED"},{"name":"Bastion","desiredState":"DISABLED"}]}' \
-            --wait-for-state RUNNING \
-            --max-wait-seconds 300 \
             2>&1 || echo "LAUNCH_FAILED")
         
         # Check result
@@ -132,9 +130,29 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
                 echo "  $INSTANCE_ID"
                 echo ""
                 
+                # Wait for instance to reach RUNNING state
+                echo "Waiting for instance to start..."
+                for i in {1..60}; do
+                    STATE=$(oci compute instance get --instance-id "$INSTANCE_ID" \
+                        --query 'data."lifecycle-state"' \
+                        --raw-output 2>/dev/null || echo "UNKNOWN")
+                    
+                    if [ "$STATE" = "RUNNING" ]; then
+                        echo "✅ Instance is RUNNING"
+                        break
+                    elif [ "$STATE" = "UNKNOWN" ]; then
+                        echo "⚠️  Could not check instance state"
+                        break
+                    else
+                        echo -n "."
+                        sleep 5
+                    fi
+                done
+                echo ""
+                
                 # Wait for networking
                 echo "Waiting for network configuration..."
-                sleep 15
+                sleep 10
                 
                 # Get public IP
                 PUBLIC_IP=$(oci compute instance list-vnics \

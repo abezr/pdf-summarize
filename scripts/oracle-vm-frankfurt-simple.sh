@@ -80,7 +80,7 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
         
         echo "[$TIMESTAMP] Attempt $TOTAL_ATTEMPTS - $AD_NAME..."
         
-        # Launch instance (simplified - no agent-config)
+        # Launch instance (simplified - no agent-config, no wait)
         LAUNCH_OUTPUT=$(oci compute instance launch \
             --compartment-id "$COMPARTMENT_ID" \
             --availability-domain "$AD" \
@@ -91,8 +91,6 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
             --display-name "$VM_NAME" \
             --assign-public-ip true \
             --ssh-authorized-keys-file "$SSH_PUBLIC_KEY_FILE" \
-            --wait-for-state RUNNING \
-            --max-wait-seconds 300 \
             2>&1 || echo "LAUNCH_FAILED")
         
         # Check result
@@ -126,8 +124,28 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
                 echo "  $INSTANCE_ID"
                 echo ""
                 
+                # Wait for instance to reach RUNNING state
+                echo "Waiting for instance to start..."
+                for i in {1..60}; do
+                    STATE=$(oci compute instance get --instance-id "$INSTANCE_ID" \
+                        --query 'data."lifecycle-state"' \
+                        --raw-output 2>/dev/null || echo "UNKNOWN")
+                    
+                    if [ "$STATE" = "RUNNING" ]; then
+                        echo "✅ Instance is RUNNING"
+                        break
+                    elif [ "$STATE" = "UNKNOWN" ]; then
+                        echo "⚠️  Could not check instance state"
+                        break
+                    else
+                        echo -n "."
+                        sleep 5
+                    fi
+                done
+                echo ""
+                
                 echo "Waiting for network configuration..."
-                sleep 15
+                sleep 10
                 
                 PUBLIC_IP=$(oci compute instance list-vnics \
                     --instance-id "$INSTANCE_ID" \

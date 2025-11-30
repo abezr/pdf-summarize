@@ -95,16 +95,7 @@ for CYCLE in $(seq 1 $MAX_CYCLES); do
             --display-name "$VM_NAME" \
             --assign-public-ip true \
             --ssh-authorized-keys-file "$SSH_PUBLIC_KEY_FILE" \
-            --agent-config '{
-                "pluginsConfig": [
-                    {"name": "Custom Logs Monitoring", "desiredState": "ENABLED"},
-                    {"name": "Compute Instance Monitoring", "desiredState": "ENABLED"},
-                    {"name": "Cloud Guard Workload Protection", "desiredState": "ENABLED"},
-                    {"name": "OS Management Service Agent", "desiredState": "DISABLED"},
-                    {"name": "Vulnerability Scanning", "desiredState": "DISABLED"},
-                    {"name": "Bastion", "desiredState": "DISABLED"}
-                ]
-            }' \
+            --agent-config '{"pluginsConfig":[{"name":"Custom Logs Monitoring","desiredState":"ENABLED"},{"name":"Compute Instance Monitoring","desiredState":"ENABLED"},{"name":"Cloud Guard Workload Protection","desiredState":"ENABLED"},{"name":"OS Management Service Agent","desiredState":"DISABLED"},{"name":"Vulnerability Scanning","desiredState":"DISABLED"},{"name":"Bastion","desiredState":"DISABLED"}]}' \
             --wait-for-state RUNNING \
             --max-wait-seconds 300 \
             2>&1 || echo "LAUNCH_FAILED")
